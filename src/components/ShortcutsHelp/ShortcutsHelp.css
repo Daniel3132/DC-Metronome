@@ -1,0 +1,94 @@
+/* Touch-only devices have no keyboard to use these with. */
+@media (hover: none) and (pointer: coarse) {
+  .ui-button.shortcuts-help__trigger {
+    display: none;
+  }
+}
+
+/* A native popover sits in the top layer, centered by its UA inset/margin. */
+.shortcuts-help {
+  width: min(380px, calc(100vw - 2 * var(--space-4)));
+  max-height: calc(100dvh - 2 * var(--space-4));
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  overflow-y: auto;
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
+}
+
+.shortcuts-help::backdrop {
+  background: var(--overlay);
+}
+
+.shortcuts-help__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.shortcuts-help__title {
+  font-size: var(--fs-lg);
+}
+
+.shortcuts-help__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.shortcuts-help__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border);
+}
+
+.shortcuts-help__row:first-child {
+  border-top: 0;
+}
+
+.shortcuts-help__keys {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
+.shortcuts-help__plus {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  white-space: pre;
+}
+
+.shortcuts-help__kbd {
+  display: inline-block;
+  min-width: 28px;
+  padding: 2px var(--space-2);
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-xs);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  text-align: center;
+}
+
+.shortcuts-help__action {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  text-align: end;
+}
+
+.shortcuts-help__note {
+  margin-top: var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}

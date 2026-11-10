@@ -1,0 +1,173 @@
+/* Silence panels: gap trainer, random mute, muted-beat note. */
+
+.silence-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* Play, silence and the quick patterns on one line when they fit. */
+.silence-panel__counts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3) var(--space-4);
+}
+
+.silence-panel__cycle-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.silence-panel__cycle-wrap.is-off {
+  opacity: 0.55;
+}
+
+.silence-panel__percent {
+  width: 10.5rem;
+}
+
+.silence-panel__percent .ui-select-input {
+  min-height: var(--control-sm);
+  border-radius: var(--radius-sm);
+}
+
+@media (pointer: fine) {
+  .silence-panel__percent .ui-select-input {
+    font-size: var(--fs-sm);
+  }
+}
+
+.silence-panel__note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+
+.silence-panel__hint {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+
+/* One block per bar of the cycle: filled = sounding, hollow = silent. */
+.silence-panel__blocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.silence-panel__block {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-xs);
+  transition:
+    box-shadow var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.silence-panel__block--play {
+  background: var(--accent);
+}
+
+.silence-panel__block--mute {
+  background: transparent;
+  border: 2px dashed var(--border-strong);
+}
+
+.silence-panel__block.is-current {
+  box-shadow:
+    0 0 0 2px var(--surface-2),
+    0 0 0 4px var(--text);
+  transform: scale(1.08);
+}
+
+/* Long cycles: a proportional two-part bar instead of dozens of blocks. */
+.silence-panel__ratio {
+  position: relative;
+  display: flex;
+  flex: 1 1 12rem;
+  gap: 2px;
+  height: 22px;
+}
+
+.silence-panel__ratio-play,
+.silence-panel__ratio-mute {
+  display: flex;
+  flex-basis: 0;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+}
+
+.silence-panel__ratio-play {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.silence-panel__ratio-mute {
+  border: 2px dashed var(--border-strong);
+  color: var(--text-secondary);
+}
+
+.silence-panel__ratio-marker {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 3px;
+  margin-inline-start: -1.5px;
+  background: var(--text);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 2px var(--surface-2);
+}
+
+.silence-panel__live {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+
+@media (forced-colors: active) {
+  .silence-panel__block--play,
+  .silence-panel__ratio-play {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .silence-panel__block--mute,
+  .silence-panel__ratio-mute {
+    border-color: CanvasText;
+  }
+
+  .silence-panel__block.is-current {
+    outline: 3px solid CanvasText;
+    outline-offset: 2px;
+  }
+}
+
+/* Random mute keeps its picker and switch in the header; on phones they drop below the title. */
+.silence-panel .ui-panel-header {
+  flex-wrap: wrap;
+}

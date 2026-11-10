@@ -1,0 +1,418 @@
+/* Program panel: section matrix plus one editor. Tokens from src/index.css, controls from ui.css. */
+
+.program-panel__summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+
+.program-panel__note {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+
+.program-panel__note--warning {
+  padding: var(--space-2) var(--space-3);
+  background: var(--warning-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+
+/* The matrix: one cell per section in play order, wrapping into rows. */
+.program-panel__matrix {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.program-panel__matrix-item {
+  display: flex;
+  min-width: 0;
+}
+
+.program-panel__cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  text-align: start;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-med) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .program-panel__cell:hover:not(:disabled, .is-active) {
+    border-color: var(--text-muted);
+  }
+}
+
+.program-panel__cell.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+}
+
+.program-panel__cell.is-playing {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-glow);
+}
+
+.program-panel__cell-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+}
+
+.program-panel__cell .program-panel__index {
+  width: 22px;
+  height: 22px;
+  font-size: var(--fs-xs);
+}
+
+.program-panel__cell.is-playing .program-panel__index {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.program-panel__cell-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.program-panel__cell.is-active .program-panel__cell-name {
+  color: var(--text);
+}
+
+.program-panel__cell-meter {
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.program-panel__cell-info {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+}
+
+.program-panel__cell-beats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 2px;
+  min-height: 20px;
+}
+
+.program-panel__cell-beats .program-panel__beat {
+  width: 6px;
+}
+
+/* Bars played in the section, along the bottom edge of the playing cell. */
+.program-panel__cell-progress {
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  background: var(--surface-3);
+}
+
+.program-panel__cell-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform: scaleX(var(--progress, 0));
+  transform-origin: left;
+  transition: transform var(--dur-med) var(--ease-out);
+}
+
+.program-panel__cell--add {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  min-height: 112px;
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+
+.program-panel__cell--add:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.program-panel__section {
+  min-width: 0;
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition:
+    border-color var(--dur-med) var(--ease-out),
+    box-shadow var(--dur-med) var(--ease-out);
+}
+
+.program-panel__section.is-playing {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-glow);
+}
+
+.program-panel__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.program-panel__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.program-panel__index {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+}
+
+.program-panel__section.is-playing .program-panel__index {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.program-panel__name {
+  flex: 1 1 auto;
+  width: 0;
+  min-width: 0;
+  min-height: var(--control-md);
+  padding: 0 var(--space-3);
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-weight: var(--fw-semibold);
+  text-overflow: ellipsis;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+.program-panel__name::placeholder {
+  color: var(--text-muted);
+  font-weight: var(--fw-regular);
+}
+
+/* Same focus treatment as the kit's Stepper field. */
+.program-panel__name:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+@media (hover: hover) {
+  .program-panel__name:hover:not(:focus-visible) {
+    border-color: var(--text-muted);
+  }
+}
+
+.program-panel__bar {
+  flex: none;
+}
+
+.program-panel__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 232px), 1fr));
+  gap: var(--space-3) var(--space-4);
+  align-items: start;
+}
+
+.program-panel__meter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.program-panel__slash {
+  color: var(--text-muted);
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-medium);
+  line-height: 1;
+}
+
+.program-panel__unit {
+  flex: none;
+  width: 5.5rem;
+}
+
+.program-panel__tempo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-height: var(--control-md);
+}
+
+.program-panel__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+/* Accent preview: one bar per beat, height by level (mute is a hollow stub). */
+.program-panel__beats {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 3px;
+  min-height: 20px;
+}
+
+.program-panel__beat {
+  width: 8px;
+  border-radius: 2px;
+}
+
+.program-panel__beat--accent {
+  height: 20px;
+  background: var(--level-accent);
+}
+
+.program-panel__beat--normal {
+  height: 14px;
+  background: var(--level-normal);
+}
+
+.program-panel__beat--medium {
+  height: 17px;
+  background: var(--level-medium);
+}
+
+.program-panel__beat--mute {
+  height: 9px;
+  border: 1px solid var(--level-soft);
+  background: transparent;
+}
+
+/* Takes a full line when the preview leaves no room, so the five actions never split at 360 px. */
+.program-panel__actions {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.program-panel__actions > :first-child {
+  margin-inline-end: auto;
+}
+
+@media (forced-colors: active) {
+  .program-panel__beat {
+    background: CanvasText;
+  }
+
+  .program-panel__beat--accent {
+    background: Highlight;
+  }
+
+  .program-panel__beat--mute {
+    border-color: CanvasText;
+    background: transparent;
+  }
+
+  .program-panel__section.is-playing,
+  .program-panel__cell.is-playing {
+    outline: 2px solid Highlight;
+  }
+
+  .program-panel__cell.is-active {
+    border-color: Highlight;
+  }
+}
+
+/* Templates: pick, load, delete, and "Save template" pushed to the end of the line. */
+.program-templates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.program-templates__select {
+  width: 13rem;
+  max-width: 100%;
+}
+
+.program-templates__select .ui-select-input {
+  min-height: var(--control-sm);
+  font-size: var(--fs-sm);
+}
+
+.program-templates__save {
+  margin-inline-start: auto;
+}
+
+.program-templates__name {
+  flex: 1 1 12rem;
+  min-width: 0;
+  min-height: var(--control-sm);
+  padding: 0 var(--space-3);
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+
+.program-templates__name:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.program-panel__unsaved {
+  flex: none;
+}
+
+.program-panel__head .ui-button {
+  flex: none;
+}

@@ -1,0 +1,224 @@
+/* Speed trainer panel and its ramp preview chart. */
+
+.practice-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.practice-panel__tempos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3) var(--space-5);
+}
+
+.practice-panel__direction {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-md);
+}
+
+/* Live status while playing. */
+.practice-panel__live {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+}
+
+.practice-panel__now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+}
+
+.practice-panel__now-label {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+
+.practice-panel__now-value {
+  color: var(--text);
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+}
+
+.practice-panel__now-unit,
+.practice-panel__now-percent {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+
+.practice-panel__live-text {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+
+.practice-panel__progress {
+  height: 8px;
+  overflow: hidden;
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+}
+
+.practice-panel__progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+/* Ramp chart: the SVG stretches to the plot box; strokes stay crisp via non-scaling-stroke. */
+.practice-panel__figure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.practice-panel__chart {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'y plot'
+    '. x';
+  column-gap: var(--space-2);
+  row-gap: var(--space-1);
+}
+
+/* Labels sit at their gridline's height (top is set inline from the same scale as the SVG). */
+.practice-panel__axis-y {
+  grid-area: y;
+  position: relative;
+  width: 3.5ch;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+.practice-panel__axis-y > span {
+  position: absolute;
+  right: 0;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.practice-panel__axis-x {
+  grid-area: x;
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+.practice-panel__plot {
+  grid-area: plot;
+  position: relative;
+  height: 128px;
+}
+
+.practice-panel__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.practice-panel__grid {
+  stroke: var(--border);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+
+.practice-panel__area {
+  fill: var(--accent);
+  fill-opacity: 0.1;
+  stroke: none;
+}
+
+.practice-panel__line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.practice-panel__line--tail {
+  stroke-dasharray: 4 4;
+  stroke-opacity: 0.7;
+}
+
+.practice-panel__current {
+  fill: var(--accent);
+  fill-opacity: 0.12;
+}
+
+.practice-panel__hit {
+  fill: transparent;
+}
+
+@media (hover: hover) {
+  .practice-panel__hit:hover {
+    fill: var(--text);
+    fill-opacity: 0.06;
+  }
+}
+
+.practice-panel__dot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--surface-1);
+  pointer-events: none;
+  transition:
+    left var(--dur-med) var(--ease-out),
+    top var(--dur-med) var(--ease-out);
+}
+
+.practice-panel__summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+
+.practice-panel__percent {
+  color: var(--text-secondary);
+  font-weight: var(--fw-regular);
+}
+
+@media (forced-colors: active) {
+  .practice-panel__line {
+    stroke: Highlight;
+  }
+
+  .practice-panel__grid {
+    stroke: GrayText;
+  }
+
+  .practice-panel__dot,
+  .practice-panel__progress-fill {
+    background: Highlight;
+  }
+
+  .practice-panel__progress {
+    border: 1px solid CanvasText;
+  }
+}

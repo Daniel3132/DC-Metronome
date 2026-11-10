@@ -1,0 +1,38 @@
+.voice-panel__options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.voice-panel__preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.voice-panel__preview-status {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+
+.voice-panel__preview-status.is-error {
+  color: var(--danger);
+}
+
+.voice-panel__notes {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: var(--space-3) var(--space-3) var(--space-3) calc(var(--space-3) + 1.1em);
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+
+.voice-panel__notes li::marker {
+  color: var(--accent-text);
+}

@@ -1,0 +1,348 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 1480px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: var(--space-1) var(--space-4) var(--space-6);
+}
+
+/*
+ * Desktop: the app is exactly one screen tall and the page never scrolls. The stage and the open tab scroll
+ * inside their own boxes when the window is too short for them.
+ */
+@media (min-width: 900px) {
+  .app {
+    /* Containing block for absolutely positioned descendants (sr-only text deep in a scroller), so they are
+       clipped here instead of stretching the page. */
+    position: relative;
+    height: 100dvh;
+    overflow: hidden;
+    padding: var(--space-1) var(--space-6) var(--space-4);
+  }
+}
+
+/* Header ---------------------------------------------------------------- */
+
+.app__header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 28px;
+}
+
+.app__header .shortcuts-help__trigger {
+  min-height: 28px;
+}
+
+.app__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.app__logo {
+  flex: none;
+  color: var(--accent);
+}
+
+.app__title {
+  overflow: hidden;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app__header-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Small flash switch beside the shortcuts button. */
+.app__flash {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+
+.app__flash > svg {
+  flex: none;
+  color: var(--accent-text);
+}
+
+.app__flash .ui-toggle {
+  min-height: 28px;
+}
+
+/* Layout: stage on top (phones), stage left + settings right (desktop) ---- */
+
+.app__main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-4);
+}
+
+@media (min-width: 900px) {
+  .app__main {
+    flex: 1 1 auto;
+    min-height: 0;
+    grid-template-columns: minmax(300px, 420px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+    gap: var(--space-5);
+  }
+}
+
+/* Smaller laptops: a narrower stage leaves the settings room for the quick controls. */
+@media (min-width: 900px) and (max-width: 1279px) {
+  .app__main {
+    grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
+  }
+}
+
+/* The stage: what a musician touches every minute. */
+.app__stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+
+@media (min-width: 640px) {
+  .app__stage {
+    padding: var(--space-4) var(--space-5);
+  }
+}
+
+@media (min-width: 900px) {
+  .app__stage {
+    /* The tempo readout follows the window height so the whole stage fits on a laptop screen. */
+    --fs-display: clamp(3.25rem, 11vh, 7rem);
+    gap: var(--space-3);
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  /* Three zones: tempo and transport on top, status at the bottom, the beat pads filling the height between. */
+  .app__stage .tempo-control {
+    gap: var(--space-2);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .app__stage .beat-grid {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-height: 0;
+  }
+
+  /* Capped so a tall window does not turn the pads into towers; past the cap they sit centered. */
+  .app__stage .beat-grid__pads {
+    flex: 1 1 auto;
+    grid-auto-rows: minmax(64px, 1fr);
+    max-height: 320px;
+  }
+
+  .app__stage .beat-grid__pad {
+    min-height: 64px;
+  }
+
+  .app__stage .transport {
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* No reserved row for the tempo badges: the stage has slack to absorb them. */
+  .app__stage .tempo-control__notes:empty {
+    display: none;
+  }
+
+  .app__stage .status-bar__item {
+    padding: var(--space-1) var(--space-3);
+  }
+}
+
+/* Settings tabs --------------------------------------------------------- */
+
+.app__settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .app__settings {
+    min-height: 0;
+  }
+}
+
+.app__tabs {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  gap: var(--space-1);
+  /* Bleed to the screen edges on phones so the bar scrolls under the gutter instead of clipping. */
+  margin: 0 calc(-1 * var(--space-4));
+  padding: var(--space-2) var(--space-4);
+  overflow-x: auto;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  scroll-padding-inline: var(--space-4);
+  scrollbar-width: none;
+}
+
+.app__tabs::-webkit-scrollbar {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .app__tabs {
+    position: static;
+    flex: none;
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 0 0 6px;
+    overflow-x: visible;
+  }
+}
+
+.app__tab {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-4);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  touch-action: manipulation;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+@media (min-width: 900px) {
+  .app__tab {
+    min-height: 30px;
+    padding: 0 var(--space-3);
+    font-size: var(--fs-sm);
+  }
+}
+
+.app__tab:focus-visible {
+  outline-offset: -2px;
+}
+
+.app__tab[aria-selected='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent-text);
+}
+
+@media (hover: hover) {
+  .app__tab:hover:not([aria-selected='true']) {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+}
+
+.app__tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+.app__tab-dot--muted {
+  background: var(--danger);
+}
+
+.app__tabpanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .app__tabpanel:not([hidden]) {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    /* Room for focus rings and the scrollbar. */
+    padding: 2px var(--space-2) var(--space-2) 2px;
+  }
+}
+
+/*
+ * Compact cards inside the tabs, so a whole tab fits the settings column without scrolling. The kit's roomier
+ * defaults stay for anything outside the tabs.
+ */
+.app__tabpanel .ui-panel,
+.app__tabpanel .ui-panel-body {
+  gap: var(--space-3);
+}
+
+.app__tabpanel .ui-panel {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+}
+
+.app__tabpanel .ui-panel-header {
+  min-height: var(--control-sm);
+}
+
+.app__tabpanel .ui-panel-title {
+  font-size: var(--fs-md);
+}
+
+.app__tabpanel .ui-panel-description {
+  font-size: var(--fs-xs);
+}
+
+@media (forced-colors: active) {
+  .app__tab[aria-selected='true'] {
+    border-color: Highlight;
+  }
+
+  .app__tab-dot {
+    background: CanvasText;
+  }
+}
+
+/* The main tab lays out its own height (program scrolls inside); the tab panel only scrolls as a last resort. */
+@media (min-width: 900px) {
+  .app__tabpanel--main:not([hidden]) {
+    padding-right: 2px;
+  }
+}

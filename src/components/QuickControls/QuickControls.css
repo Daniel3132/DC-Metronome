@@ -1,0 +1,194 @@
+/* Everything in the main tab runs a size smaller than the kit default, so more fits on screen. */
+.quick-controls {
+  --control-md: 30px;
+  --control-sm: 28px;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/*
+ * Small cards that wrap into rows. Each has a natural width (flex-basis) and the spare width of a row is shared
+ * out, so rows end flush; the voice card stays as narrow as its switch. On phones a card never exceeds the row.
+ */
+.quick-controls__grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--space-3);
+}
+
+.quick-controls__cell {
+  display: flex;
+  flex: 1 1 10rem;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px var(--space-3) var(--space-2);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.quick-controls__cell--signature {
+  flex-basis: 13rem;
+}
+
+.quick-controls__cell--subdivision {
+  flex-basis: 10.5rem;
+}
+
+.quick-controls__cell--accents {
+  flex-basis: 8rem;
+}
+
+.quick-controls__cell--rest {
+  flex-basis: 13rem;
+}
+
+.quick-controls__cell--practice {
+  flex-basis: 23.5rem;
+  container-type: inline-size;
+}
+
+.quick-controls__cell--voice {
+  flex: none;
+  align-items: flex-start;
+}
+
+.quick-controls__cell--volume {
+  flex-basis: 13rem;
+}
+
+.quick-controls__cell-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--control-sm);
+}
+
+.quick-controls__cell-label {
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Chips: even columns so wrapped rows line up. */
+.ui-segmented.quick-controls__chips {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: 100%;
+}
+
+/* The four common subdivisions as a 2 × 2 block, so the card stays narrow. */
+.ui-segmented.quick-controls__chips--subdivisions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.quick-controls__chips .ui-segmented-item {
+  min-width: 0;
+  padding: 0 var(--space-1);
+  font-size: var(--fs-xs);
+}
+
+.quick-controls__notation {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.ui-segmented-item[aria-checked='true'] .quick-controls__notation {
+  color: var(--accent);
+}
+
+/* The pickers in the cell headers stay small. */
+.quick-controls__more {
+  width: 5.25rem;
+}
+
+.quick-controls__all-subdivisions {
+  width: 5.75rem;
+}
+
+.quick-controls__all-subdivisions .subdivision-picker__trigger {
+  min-height: var(--control-sm);
+}
+
+/* Selects inside the cards are as wide as their content needs, never the whole card. */
+.quick-controls__accents {
+  width: 8.5rem;
+  max-width: 100%;
+}
+
+.quick-controls__gap {
+  width: 6rem;
+}
+
+.quick-controls .ui-select-input {
+  min-height: var(--control-sm);
+  border-radius: var(--radius-sm);
+}
+
+/* Below 16 px iOS zooms into a focused select, so only mouse-driven screens get the smaller text. */
+@media (pointer: fine) {
+  .quick-controls .ui-select-input {
+    font-size: var(--fs-sm);
+  }
+}
+
+.quick-controls .ui-toggle {
+  min-height: var(--control-sm);
+}
+
+/* Rest bar: random mute as a mini line under the gap pattern. */
+.quick-controls__random {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.quick-controls__random .ui-toggle-label {
+  font-size: var(--fs-sm);
+}
+
+.quick-controls__percent {
+  width: 5.25rem;
+}
+
+/* Speed trainer: four small steppers, 2 × 2 on narrow cards and on one line when the card is wide enough. */
+.quick-controls__steppers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+@container (min-width: 400px) {
+  .quick-controls__steppers {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.quick-controls__steppers .ui-stepper {
+  gap: 2px;
+}
+
+.quick-controls__steppers .ui-field-label {
+  font-size: var(--fs-xs);
+}
+
+.quick-controls__steppers .ui-stepper-input {
+  font-size: var(--fs-sm);
+}
+
+.quick-controls__cell .silence-status {
+  font-size: var(--fs-xs);
+}

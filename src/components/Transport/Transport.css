@@ -1,0 +1,66 @@
+.transport {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.transport__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+/* Kept well below the tempo readout so the BPM stays the biggest thing on the stage. */
+.ui-button.transport__play {
+  min-height: 52px;
+  font-size: var(--fs-lg);
+  letter-spacing: 0.01em;
+}
+
+.ui-button.transport__play:only-child {
+  grid-column: 1 / -1;
+}
+
+.ui-button.transport__play.is-running {
+  border-color: var(--accent-border);
+  color: var(--accent-text);
+}
+
+.transport__aside {
+  display: flex;
+  min-width: 0;
+}
+
+.transport__aside .tap-tempo {
+  min-height: 52px;
+  padding-block: var(--space-1);
+}
+
+.transport__aside .tap-tempo__main {
+  font-size: var(--fs-lg);
+}
+
+.transport__message {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  line-height: 1.4;
+}
+
+/* The status region stays in the DOM (live regions must exist before they change) but takes no space when empty. */
+.transport__message:not(:empty) {
+  margin-top: var(--space-2);
+}
+
+.transport__message--error {
+  padding: var(--space-2) var(--space-3);
+  background: var(--danger-soft);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+}
+
+.transport__message--done {
+  color: var(--success);
+}

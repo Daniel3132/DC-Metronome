@@ -1,0 +1,95 @@
+.meter-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* Time signature and subdivision side by side when the column has room, stacked otherwise. */
+.meter-panel__columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  align-items: start;
+  gap: var(--space-3);
+}
+
+.meter-panel__signature {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 2.2ch;
+  color: var(--accent-text);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+}
+
+.meter-panel__signature > span + span {
+  padding-top: 2px;
+  border-top: 2px solid currentColor;
+}
+
+.meter-panel__meter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3) var(--space-4);
+}
+
+.meter-panel__unit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Common meters: even columns so a wrapped second row lines up. */
+.ui-segmented.meter-panel__common {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* Subdivision picker: the kit's radiogroup laid out as an even grid of small cards. */
+.ui-segmented.meter-panel__subdivisions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 84px), 1fr));
+  width: 100%;
+}
+
+.meter-panel__subdivisions .ui-segmented-item {
+  min-height: 50px;
+  padding: var(--space-1);
+  white-space: normal;
+}
+
+.meter-panel__subdivision {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--fs-xs);
+  text-align: center;
+}
+
+.meter-panel__notation {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.ui-segmented-item[aria-checked='true'] .meter-panel__notation {
+  color: var(--accent);
+}
+
+.meter-panel__flash {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.meter-panel__flash > svg {
+  flex: none;
+  color: var(--accent-text);
+}

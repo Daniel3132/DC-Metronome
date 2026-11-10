@@ -1,0 +1,104 @@
+.tap-tempo {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'icon main'
+    'icon sub';
+  align-items: center;
+  column-gap: var(--space-2);
+  width: 100%;
+  min-height: 72px;
+  padding: var(--space-2) var(--space-4);
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--text);
+  text-align: start;
+  /* Fast repeated taps must not zoom the page or select text. */
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+
+.tap-tempo:active {
+  background: var(--surface-3);
+}
+
+.tap-tempo.is-active {
+  border-color: var(--accent-border);
+}
+
+@media (hover: hover) {
+  .tap-tempo:hover {
+    border-color: var(--text-muted);
+  }
+
+  .tap-tempo.is-active:hover {
+    border-color: var(--accent);
+  }
+}
+
+.tap-tempo__icon,
+.tap-tempo__main,
+.tap-tempo__sub {
+  /* Above the ripple. */
+  position: relative;
+}
+
+.tap-tempo__icon {
+  grid-area: icon;
+  display: inline-flex;
+  color: var(--accent-text);
+}
+
+.tap-tempo__main {
+  grid-area: main;
+  overflow: hidden;
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-bold);
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tap-tempo__sub {
+  grid-area: sub;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tap-tempo__ripple {
+  position: absolute;
+  inset: 0;
+  background: var(--accent-soft);
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  animation: tap-tempo-hit 240ms ease-out;
+}
+
+@keyframes tap-tempo-hit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tap-tempo__ripple {
+    animation-duration: 120ms;
+  }
+}

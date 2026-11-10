@@ -1,0 +1,350 @@
+.sound-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  border-radius: var(--radius-lg);
+}
+
+/* Files can be dropped anywhere on the tab; show that the whole area is a target. */
+.sound-panel.is-dragging {
+  outline: 2px dashed var(--accent);
+  outline-offset: 4px;
+}
+
+/* Kits ------------------------------------------------------------------- */
+
+.sound-panel__kits {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 8.5rem), 1fr));
+  gap: var(--space-2);
+}
+
+.sound-panel__kit {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+/* The real radio covers the card, so clicks, keyboard and assistive tech all hit a native control. */
+.sound-panel__kit-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.sound-panel__kit-face {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--control-lg);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-tight);
+  pointer-events: none;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.sound-panel__kit-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sound-panel__kit-icon {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.sound-panel__kit-input:checked + .sound-panel__kit-face {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent-text);
+  font-weight: var(--fw-semibold);
+}
+
+.sound-panel__kit-input:checked + .sound-panel__kit-face .sound-panel__kit-icon {
+  color: var(--accent-text);
+}
+
+.sound-panel__kit-input:focus-visible + .sound-panel__kit-face {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.sound-panel__kit-input:active + .sound-panel__kit-face {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) {
+  .sound-panel__kit-input:hover:not(:checked) + .sound-panel__kit-face {
+    background: var(--surface-3);
+    border-color: var(--border-strong);
+  }
+
+  .sound-panel__kit-input:hover + .sound-panel__kit-face .sound-panel__kit-icon {
+    color: var(--accent-text);
+  }
+}
+
+@media (forced-colors: active) {
+  .sound-panel__kit-input:checked + .sound-panel__kit-face {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+
+/* Roles ------------------------------------------------------------------ */
+
+.sound-panel__roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-4);
+}
+
+.sound-panel__role {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.sound-panel__role-warning {
+  grid-column: 1 / -1;
+  color: var(--warning);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+
+/* Upload ----------------------------------------------------------------- */
+
+.sound-panel__dropzone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-4);
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.sound-panel.is-dragging .sound-panel__dropzone {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.sound-panel__dropzone-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sound-panel__dropzone-drop {
+  color: var(--text-secondary);
+  font-weight: var(--fw-medium);
+}
+
+.sound-panel.is-dragging .sound-panel__dropzone-drop {
+  color: var(--accent-text);
+  font-weight: var(--fw-semibold);
+}
+
+.sound-panel__dropzone-limits {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.sound-panel__error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  background: var(--danger-soft);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+
+.sound-panel__error .ui-button {
+  flex: none;
+  color: inherit;
+}
+
+.sound-panel__status {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+
+/* Keep the live region in the accessibility tree while empty, without taking layout space. */
+.sound-panel__status:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.sound-panel__empty {
+  padding: var(--space-2) 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+
+/* Uploaded sounds -------------------------------------------------------- */
+
+.sound-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sound-panel__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.sound-panel__item-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.sound-panel__item-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Reads as plain text until hovered or focused; the text lines up with the meta line below. */
+.sound-panel__name {
+  width: calc(100% + var(--space-2));
+  min-height: var(--control-sm);
+  margin-left: calc(var(--space-2) * -1);
+  padding: 0 var(--space-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-weight: var(--fw-semibold);
+  text-overflow: ellipsis;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.sound-panel__name:focus {
+  background: var(--surface-1);
+  border-color: var(--accent);
+}
+
+@media (hover: hover) {
+  .sound-panel__name:hover:not(:focus) {
+    border-color: var(--border-strong);
+  }
+}
+
+.sound-panel__meta {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.3;
+}
+
+.sound-panel__usage {
+  color: var(--accent-text);
+}
+
+.sound-panel__use {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+@media (min-width: 480px) {
+  .sound-panel__use {
+    padding-left: calc(var(--control-md) + var(--space-3));
+  }
+}
+
+.sound-panel__use-label {
+  margin-right: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sound-panel__use .ui-button[aria-pressed='true'],
+.sound-panel__use .ui-button[aria-pressed='true']:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent-text);
+}
+
+@media (forced-colors: active) {
+  .sound-panel__use .ui-button[aria-pressed='true'] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+
+.sound-panel__confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  background: var(--danger-soft);
+  border-radius: var(--radius-sm);
+}
+
+.sound-panel__confirm-text {
+  min-width: 0;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.sound-panel__confirm-actions {
+  display: flex;
+  gap: var(--space-2);
+}

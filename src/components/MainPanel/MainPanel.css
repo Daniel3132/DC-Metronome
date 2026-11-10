@@ -1,0 +1,186 @@
+.main-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* Program, a size smaller than in its own tab: small controls, small cells, only the warnings as notes. */
+.main-panel .program-panel {
+  --control-md: 32px;
+  --control-sm: 30px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+
+.main-panel .program-panel .ui-panel-body {
+  gap: var(--space-2);
+}
+
+.main-panel .program-panel .ui-panel-header {
+  min-height: var(--control-sm);
+}
+
+/* Minimized: the header alone, with the program summary as its subtitle. */
+.main-panel .program-panel.is-collapsed .ui-panel-description {
+  display: block;
+}
+
+/* Loop, then a divider, then the program on/off switch. */
+.program-panel__loop {
+  display: inline-flex;
+  padding-right: var(--space-3);
+  border-right: 1px solid var(--border);
+}
+
+.program-panel__loop .ui-toggle-label {
+  font-size: var(--fs-sm);
+}
+
+.program-panel__collapse svg {
+  transform: rotate(180deg);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.program-panel.is-collapsed .program-panel__collapse svg {
+  transform: none;
+}
+
+.main-panel .program-panel .ui-panel-description,
+.main-panel .program-panel__note:not(.program-panel__note--warning),
+.main-panel .program-panel .ui-field-hint {
+  display: none;
+}
+
+.main-panel .program-panel__summary {
+  font-size: var(--fs-xs);
+}
+
+.main-panel .program-panel__matrix {
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: var(--space-1);
+}
+
+.main-panel .program-panel__cell {
+  gap: 3px;
+  padding: var(--space-1) var(--space-2) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.main-panel .program-panel__cell .program-panel__index {
+  width: 18px;
+  height: 18px;
+}
+
+.main-panel .program-panel__cell-name {
+  font-size: var(--fs-xs);
+}
+
+.main-panel .program-panel__cell-meter {
+  font-size: var(--fs-lg);
+}
+
+.main-panel .program-panel__cell-beats {
+  min-height: 14px;
+}
+
+.main-panel .program-panel__cell--add {
+  min-height: 72px;
+  font-size: var(--fs-xs);
+}
+
+.main-panel .program-panel__section {
+  padding: var(--space-2);
+}
+
+.main-panel .program-panel__group {
+  gap: var(--space-2);
+}
+
+.main-panel .program-panel__index {
+  width: 24px;
+  height: 24px;
+  font-size: var(--fs-xs);
+}
+
+.main-panel .program-panel__name {
+  font-size: var(--fs-sm);
+}
+
+.main-panel .program-panel__fields {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr));
+  gap: var(--space-2) var(--space-3);
+}
+
+.main-panel .program-panel .ui-field-label {
+  font-size: var(--fs-xs);
+}
+
+.main-panel .program-panel .ui-stepper {
+  gap: 2px;
+}
+
+.main-panel .program-panel .ui-stepper-input,
+.main-panel .program-panel .ui-select-input,
+.main-panel .program-panel .ui-toggle-label {
+  font-size: var(--fs-sm);
+}
+
+.main-panel .program-panel__unit {
+  width: 4.5rem;
+}
+
+.main-panel .program-panel__foot {
+  padding-top: var(--space-2);
+}
+
+/* Program fields keep their natural width instead of stretching across the column (a 300 px "Bars" stepper). */
+.main-panel .program-panel__fields > * {
+  justify-self: start;
+  max-width: 100%;
+}
+
+.main-panel .program-panel__fields .ui-select {
+  width: 10rem;
+  max-width: 100%;
+}
+
+/*
+ * Desktop: the page never scrolls. The quick controls keep their height and the program card takes what is left;
+ * when it holds more sections than fit, only its contents scroll.
+ */
+@media (min-width: 900px) {
+  .main-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .main-panel .quick-controls {
+    flex: none;
+  }
+
+  /* Shrinks (and scrolls inside) when space runs out, but never stretches into an empty card. */
+  .main-panel .program-panel:not(.is-collapsed) {
+    flex: 0 1 auto;
+    min-height: 8rem;
+  }
+
+  .main-panel .program-panel .ui-panel-header {
+    flex: none;
+  }
+
+  .main-panel .program-panel .ui-panel-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    /* Room for focus rings next to the scrollbar. */
+    margin-right: calc(-1 * var(--space-2));
+    padding: 2px var(--space-2) 2px 2px;
+  }
+
+  .main-panel .program-panel .ui-panel-body > * {
+    flex-shrink: 0;
+  }
+}

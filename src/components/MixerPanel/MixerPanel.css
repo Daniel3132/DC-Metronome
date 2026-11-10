@@ -1,0 +1,36 @@
+/* Faders stay side by side at every width; only this strip scrolls when a phone is too narrow. */
+.mixer-panel__scroller {
+  --slider-length: 200px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  /* Room for the fader caps' focus rings, which the scroll container would otherwise clip. */
+  padding: var(--space-1) var(--space-2);
+  margin-inline: calc(var(--space-2) * -1);
+  scrollbar-width: thin;
+}
+
+.mixer-panel__strips {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-evenly;
+  gap: var(--space-3);
+  width: max-content;
+  min-width: 100%;
+}
+
+.mixer-panel__divider {
+  flex: none;
+  align-self: stretch;
+  width: 1px;
+  background: var(--border);
+}
+
+@media (max-width: 479px) {
+  .mixer-panel__scroller {
+    --slider-length: 168px;
+  }
+
+  .mixer-panel__strips {
+    gap: var(--space-1);
+  }
+}
