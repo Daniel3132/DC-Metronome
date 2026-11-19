@@ -1,5 +1,5 @@
 import { MAX_BPM, MAX_PRACTICE_EVERY_BARS, MAX_PRACTICE_STEP, MIN_BPM } from '../../core/constants'
-import { effectiveBpm } from '../../core/settings'
+import { beatSeconds } from '../../core/settings'
 import type { PracticeAtTarget, PracticeSettings, PracticeState } from '../../core/types'
 import { RepeatIcon, TrendDownIcon, TrendUpIcon } from '../icons/icons'
 import type { PanelProps } from '../panelTypes'
@@ -25,10 +25,6 @@ function formatDuration(seconds: number): string {
   const m = Math.floor((total % 3600) / 60)
   const s = String(total % 60).padStart(2, '0')
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`
-}
-
-function formatBpm(bpm: number): string {
-  return String(Math.round(bpm * 10) / 10)
 }
 
 function stepToward(from: number, to: number, step: number): number {
@@ -215,7 +211,7 @@ export function PracticePanel({ settings, onChange, metronome }: PanelProps) {
   const pass = rampSteps({ ...practice, atTarget: 'stop' }, Number.POSITIVE_INFINITY)
   const passBars = pass.length * practice.everyBars
   const passSeconds = pass.reduce(
-    (sum, step) => sum + (practice.everyBars * section.beatsPerBar * 60) / effectiveBpm(step.bpm, tempoPercent),
+    (sum, step) => sum + practice.everyBars * section.beatsPerBar * beatSeconds(step.bpm, section.beatUnit),
     0,
   )
 
@@ -224,11 +220,9 @@ export function PracticePanel({ settings, onChange, metronome }: PanelProps) {
       ? `Constant ${practice.startBpm} BPM. Set a different target to build a ramp.`
       : `${practice.startBpm} → ${practice.targetBpm} BPM in ${plural(pass.length - 1, 'step')}, ` +
         `${plural(passBars, 'bar')} (about ${formatDuration(passSeconds)}), ${afterTargetText(practice)}.`
+  // The speed trainer plays its tempos exactly as set: the tempo percentage does not apply to it.
   const percentNote =
-    tempoPercent === 100
-      ? null
-      : `At ${tempoPercent} % tempo that plays as ${formatBpm(effectiveBpm(practice.startBpm, tempoPercent))} → ` +
-        `${formatBpm(effectiveBpm(practice.targetBpm, tempoPercent))} BPM.`
+    tempoPercent === 100 ? null : `The tempo percentage (${tempoPercent} %) does not apply to the speed trainer.`
 
   function setPractice(update: Partial<PracticeSettings>) {
     onChange((prev) => ({ ...prev, practice: { ...prev.practice, ...update } }))
@@ -260,11 +254,6 @@ export function PracticePanel({ settings, onChange, metronome }: PanelProps) {
                   <span className="practice-panel__now-label">Now</span>
                   <span className="practice-panel__now-value tabular">{live.bpm}</span>
                   <span className="practice-panel__now-unit">BPM</span>
-                  {tempoPercent !== 100 && (
-                    <span className="practice-panel__now-percent tabular">
-                      {`plays at ${formatBpm(effectiveBpm(live.bpm, tempoPercent))}`}
-                    </span>
-                  )}
                 </div>
                 <p className="practice-panel__live-text tabular">
                   {next === null

@@ -285,6 +285,10 @@
   background: var(--danger);
 }
 
+.app__tab-dot--off {
+  visibility: hidden;
+}
+
 .app__tabpanel {
   display: flex;
   flex-direction: column;

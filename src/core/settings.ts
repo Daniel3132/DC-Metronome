@@ -75,6 +75,20 @@ export function effectiveBpm(baseBpm: number, tempoPercent: number): number {
   return Number.isNaN(bpm) ? DEFAULT_BPM : clamp(bpm, MIN_BPM, MAX_BPM)
 }
 
+/** Tempo that plays: the speed trainer's tempo plays exactly as set; every other tempo is scaled by the percentage. */
+export function playedBpm(baseBpm: number, tempoPercent: number, speedTrainer: boolean): number {
+  return effectiveBpm(baseBpm, speedTrainer ? DEFAULT_TEMPO_PERCENT : tempoPercent)
+}
+
+/**
+ * Seconds one beat lasts. The tempo always counts quarter notes, so a beat of an eighth-note meter (3/8, 6/8) lasts
+ * half as long as one of 3/4, a sixteenth a quarter as long, and a half note (2/2) twice as long.
+ */
+export function beatSeconds(bpm: number, beatUnit: BeatUnit): number {
+  const unit = BEAT_UNITS.includes(beatUnit) ? beatUnit : 4
+  return (60 / bpm) * (4 / unit)
+}
+
 /** A new section with sensible defaults (4/4, accent on 1, quarter subdivision, 4 bars, tempo null, name 'Section'), overridden by `partial`. `beats` is re-fitted to `beatsPerBar`. */
 export function createSection(partial: Partial<Omit<Section, 'id'>> = {}): Section {
   const beatsPerBar = intIn(partial.beatsPerBar, 4, 1, MAX_BEATS_PER_BAR)
@@ -222,7 +236,8 @@ function sanitize(raw: unknown): Settings {
       muteBars: intIn(gap.muteBars, d.gap.muteBars, 1, MAX_GAP_BARS),
     },
     randomMute: {
-      enabled: bool(randomMute.enabled, d.randomMute.enabled),
+      // Random mute was removed from the app: it is always off, even in old settings and presets.
+      enabled: false,
       percent: intIn(randomMute.percent, d.randomMute.percent, 0, 100),
     },
     practice: {

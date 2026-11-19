@@ -6,22 +6,32 @@ A practice metronome for the browser. Its clicks are scheduled on the Web Audio 
 
 - **Tempo** from 60 to 300 BPM: type it, drag the slider, use the ±1 and ±5 buttons (they repeat while held), or use the arrow keys. The Italian tempo marking (Adagio, Allegro …) is shown above the number.
 - **Tap tempo**: the Tap button or the `T` key. A long pause starts a new measurement.
-- **Tempo percentage** (25–200 %): practise at a fraction of the set tempo without losing it.
-- **Time signatures**: 1–16 beats over 2, 4, 8 or 16, with grouping chips for odd meters (2+2+3 …).
+- **Tempo percentage** (25–200 %): practise at a fraction of the set tempo without losing it. It does not apply to the speed trainer, which always plays its own tempos.
+- **Time signatures**: 1–16 beats over 2, 4, 8 or 16, with grouping chips for odd meters (2+2+3 …). The tempo always counts quarter notes, so 3/8 plays twice as fast as 3/4 at the same BPM (and 2/2 half as fast as 2/4).
 - **Subdivisions**: eighths, triplets, sixteenths, quintuplets, sextuplets, swing, gallop, reverse gallop and dotted.
 - **Accents and silent beats**: one-tap accent patterns (Plain = accent on 1 only, or groupings like 3+3, 2+2+3), and a beat pad click cycles it through accent, sub-accent, normal and mute. The sub-accent (beat 4 of 6/8 as 3+3) has its own sound and mixer fader.
 - **Program mode**: a matrix of sections (time signature and bars at a glance), each with its own bars and optional tempo. Signature, accents and subdivision come from the quick controls: picking a section loads its rhythm there, and **Save section** writes your changes back, so editing never changes a section by accident. Outside program mode the rhythm in the quick controls plays. It plays once or loops, and **templates** save and load whole programs (sections and loop).
-- **Silence**:
-  - a gap trainer (e.g. 2 bars played, 1 bar silent)
-  - random mute (a percentage of beats is dropped)
+- **Program as text**: type a whole program in one line, Emmet style, and press Enter (**Replace**) or **Append**. A live preview shows the result or what is wrong. The pencil button writes the current program as text so you can edit it.
+
+  | Text | Makes |
+  | --- | --- |
+  | `3/8x3, 4/4x2` | 3 bars of 3/8, then 2 bars of 4/4 |
+  | `4/4x8@140` | 8 bars of 4/4 at its own tempo, 140 BPM |
+  | `7/8(2+2+3)x4` | 7/8 with accents grouped 2+2+3 (`(7)` = accent on 1 only) |
+  | `intro:4/4x4, verse:3/4x8` | named sections |
+  | `[3/4x2, 4/4]x3` | a group repeated 3 times (groups can nest) |
+
+  Bars default to 1, `*` works like `x`, and commas, semicolons or new lines separate sections. Subdivisions and hand-edited accents have no syntax yet: new sections play beats only.
+- **Rest bar (gap trainer)**: e.g. 2 bars played, 1 bar silent.
 - **Speed trainer**: raises or lowers the tempo by a step every N bars, from a start tempo to a target. At the target it holds, restarts, turns around (ping-pong) or stops. A ramp preview shows the whole path.
 - **Sounds**:
   - 10 synthesized kits (click, beep, woodblock, cowbell, clave, hi-hat, rimshot, mechanical, bell, kick), chosen separately for accent, sub-accent, beat and subdivision
   - your own uploaded files (WAV, MP3 or OGG, up to 5 MB and 4 s each)
 - **Voice counting** ("one two three four"): English male, English female or Spanish female. It can also count subdivisions ("1 e and a", "1 trip let"), and you can keep or drop the clicks underneath. Words speed up at fast tempos.
 - **Mixer**: master volume with a mute button and an output meter, plus faders for accent, sub-accent, beat, subdivision and voice.
-- **Quick tab**: the main settings tab is a grid of small cells with everything used while practising: time signature and subdivision (most-used choices as chips, a picker for the rest), accents, rest bar (gap trainer `2:1` … plus random mute), speed trainer, voice, master volume, and the program matrix below (it can be minimized). Voice, Sound, Mixer and Presets have their own tabs; the flash switch sits in the header.
-- **Presets**: save, rename, overwrite, delete, and import or export them as JSON. There are also 10 factory presets (waltz, 6/8, 7/8, song form …).
+- **Quick tab**: the main settings tab is a grid of small cells with everything used while practising: time signature and subdivision (most-used choices as chips, a picker for the rest), accents and rest bar as one-tap chips (Plain, 3+3 …; gap trainer `2:1` …), speed trainer, voice and master volume. Below them a switch shows either the program (minimized until you expand it) or your presets, at least 3 to a row, loaded with one tap. Voice, Sound, Mixer and Presets have their own tabs; the flash switch sits in the header.
+- **Presets**: save, rename, overwrite, delete, and import or export them as JSON. A preset keeps everything, the program included. There are also 10 factory presets (waltz, 6/8, 7/8, song form …).
+- **Clear stored data**: the button at the bottom of the Presets tab erases settings, presets, templates and uploaded sounds from this browser and restarts with factory defaults.
 - **Visual feedback**: the playing beat lights up on the beat grid, the status bar shows bar, beat, time, section and trainers, and you can turn on a screen flash on every beat.
 
 ## Keyboard shortcuts
@@ -35,7 +45,6 @@ A practice metronome for the browser. Its clicks are scheduled on the Web Audio 
 | `+` / `−` | Tempo % ±5 |
 | `M` | Mute / unmute |
 | `S` | Rest bar (gap trainer) on / off |
-| `R` | Random mute on / off |
 | `V` | Voice counting on / off |
 | `P` | Program mode on / off |
 | `A` | Speed trainer on / off |
@@ -82,7 +91,7 @@ src/
     meter.ts                 Default accents, groupings, resizing, tempo markings
     tapTempo.ts              Tap tempo detector
     sequencer.ts             Turns Settings into a stream of timed PulseEvents (program, gap,
-                             random mute, speed trainer, voice words); drift-free timing
+                             speed trainer, voice words); drift-free timing
   audio/       Web Audio
     sounds.ts                Synthesized built-in sounds (deterministic DSP)
     customSounds.ts          IndexedDB storage for uploaded sounds

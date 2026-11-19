@@ -162,12 +162,24 @@ describe('timing', () => {
     }
   })
 
-  it('ignores the beat unit: the tempo always counts the denominator', () => {
+  it('counts quarter notes: an eighth-note beat is twice as fast, a half note twice as slow', () => {
+    const beatSecondsByUnit = { 2: 1, 4: 0.5, 8: 0.25, 16: 0.125 } as const
     for (const beatUnit of [2, 4, 8, 16] as const) {
       const settings = makeSettings({ bpm: 120, sections: [section({ beatsPerBar: 3, beatUnit })] })
       const events = take(createSequencer(settings, 0), settings, 4)
-      expect(events.map((e) => e.time)).toEqual([0, 0.5, 1, 1.5])
+      const spb = beatSecondsByUnit[beatUnit]
+      expect(events.map((e) => e.time)).toEqual([0, spb, 2 * spb, 3 * spb])
+      expect(events[0].beatDuration).toBe(spb)
+      expect(events[0].bpm).toBe(120)
     }
+  })
+
+  it('plays 3/8 twice as fast as 3/4 at the same tempo', () => {
+    const bar = (beatUnit: 4 | 8) => {
+      const settings = makeSettings({ bpm: 90, sections: [section({ beatsPerBar: 3, beatUnit })] })
+      return take(createSequencer(settings, 0), settings, 4)[3].time
+    }
+    expectTime(bar(8), bar(4) / 2)
   })
 
   it('applies the tempo percentage', () => {
@@ -776,8 +788,9 @@ describe('program mode', () => {
       [1, 0, 1, 3, 60, 6],
       [2, 0, 1, 7, 180, 7],
     ])
-    const cycle = 2 + 2 + 3 + 7 / 3
-    const expected = [0, 2, 4, 7, cycle, cycle + 2, cycle + 4, cycle + 7]
+    // a: 4/4 at 120 (2 s a bar, twice), b: 3/8 at 60 (eighths of 0.5 s), c: 7/8 at 180 (eighths of 1/6 s).
+    const cycle = 2 + 2 + 1.5 + 7 / 6
+    const expected = [0, 2, 4, 5.5, cycle, cycle + 2, cycle + 4, cycle + 5.5]
     starts.forEach((event, i) => expectTime(event.time, expected[i]))
   })
 
@@ -1009,12 +1022,13 @@ describe('practice mode', () => {
     expect(bpms(practiceBars({ startBpm: 40, targetBpm: 75, stepBpm: 5, everyBars: 1 }, 5))).toEqual([
       MIN_BPM, 65, 70, 75, 75,
     ])
+    // The tempo percentage does not apply to the speed trainer, so 150 % cannot push it past the target.
     const fast = practiceBars({ startBpm: 280, targetBpm: 300, stepBpm: 10, everyBars: 1 }, 3, { tempoPercent: 150 })
-    expect(fast.map((e) => e.bpm)).toEqual([MAX_BPM, MAX_BPM, MAX_BPM])
+    expect(fast.map((e) => e.bpm)).toEqual([280, 290, 300])
     expect(bpms(fast)).toEqual([280, 290, 300])
   })
 
-  it('overrides the global and section tempos, under the tempo percentage', () => {
+  it('overrides the global and section tempos, and ignores the tempo percentage', () => {
     const starts = practiceBars({}, 3, {
       bpm: 200,
       tempoPercent: 75,
@@ -1022,9 +1036,9 @@ describe('practice mode', () => {
       program: { enabled: true, loop: true },
     })
     expect(starts.map((e) => [e.baseBpm, e.bpm])).toEqual([
-      [100, 75],
-      [100, 75],
-      [105, 78.75],
+      [100, 100],
+      [100, 100],
+      [105, 105],
     ])
   })
 
@@ -1253,7 +1267,7 @@ describe('robustness', () => {
         expect(event.duration).toBeGreaterThan(0)
         expect(event.bpm).toBeGreaterThanOrEqual(MIN_BPM)
         expect(event.bpm).toBeLessThanOrEqual(MAX_BPM)
-        expectTime(event.beatDuration, 60 / event.bpm)
+        expectTime(event.beatDuration, (60 / event.bpm) * (4 / settings.sections[event.sectionIndex].beatUnit))
         expect(event.beat).toBeGreaterThanOrEqual(0)
         expect(event.beat).toBeLessThan(event.beatsPerBar)
         expect(event.pulse).toBeLessThan(event.pulsesInBeat)
@@ -1274,8 +1288,8 @@ describe('robustness', () => {
         if (previous) {
           const gap = event.time - previous.time
           expect(gap).toBeGreaterThan(1e-3)
-          // At most one beat at the slowest tempo.
-          expect(gap).toBeLessThanOrEqual(60 / MIN_BPM + TOLERANCE)
+          // At most one beat at the slowest tempo, in the longest beat unit (a half note lasts two quarters).
+          expect(gap).toBeLessThanOrEqual((60 / MIN_BPM) * 2 + TOLERANCE)
           if (event.totalBar === previous.totalBar) {
             // Position within the bar only moves forward.
             expect(event.beat > previous.beat || (event.beat === previous.beat && offset > previousOffset)).toBe(true)

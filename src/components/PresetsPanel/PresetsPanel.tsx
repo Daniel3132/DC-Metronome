@@ -1,9 +1,9 @@
 import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from 'react'
 import { STORAGE_KEYS } from '../../core/constants'
 import { makeId, sanitizeSettings } from '../../core/settings'
-import type { Settings } from '../../core/types'
 import { FACTORY_PRESETS, type FactoryPreset } from '../../state/factoryPresets'
-import { loadPresets, savePresets, type Preset } from '../../state/storage'
+import { applyFactoryPreset, applyPreset, describeSettings, suggestedName } from '../../state/presetSummary'
+import { clearStoredData, loadPresets, savePresets, type Preset } from '../../state/storage'
 import { CheckIcon, DownloadIcon, EditIcon, SaveIcon, TrashIcon, UploadIcon, XIcon } from '../icons/icons'
 import type { PanelProps } from '../panelTypes'
 import { Button, IconButton, Panel } from '../ui/ui'
@@ -39,26 +39,6 @@ function plural(count: number, word: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function describeSettings(s: Settings): string {
-  const section = s.current
-  const parts = [
-    s.practice.enabled ? `${s.practice.startBpm} → ${s.practice.targetBpm} BPM` : `${s.bpm} BPM`,
-    s.program.enabled ? plural(s.sections.length, 'section') : `${section.beatsPerBar}/${section.beatUnit}`,
-  ]
-  if (s.tempoPercent !== 100) parts.push(`${s.tempoPercent} %`)
-  if (s.gap.enabled) parts.push(`gap ${s.gap.playBars}:${s.gap.muteBars}`)
-  if (s.randomMute.enabled) parts.push(`random mute ${s.randomMute.percent} %`)
-  if (s.voice.enabled) parts.push('voice')
-  return parts.join(' · ')
-}
-
-function suggestedName(s: Settings): string {
-  const section = s.current
-  return s.program.enabled
-    ? `Program, ${plural(s.sections.length, 'section')}`
-    : `${s.bpm} BPM ${section.beatsPerBar}/${section.beatUnit}`
 }
 
 /** Accepts our export format, a bare preset array, or a single preset object. */
@@ -100,6 +80,15 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
   const saveInputId = `${uid}-save-name`
   const placeholder = suggestedName(settings)
 
+  async function clearAll() {
+    const ok = window.confirm(
+      'Clear all stored data?\n\nThis deletes your settings, presets, program templates and uploaded sounds from this browser. It cannot be undone.',
+    )
+    if (!ok) return
+    await clearStoredData()
+    window.location.reload()
+  }
+
   function commit(next: Preset[]) {
     setPresets(next)
     savePresets(next)
@@ -118,20 +107,12 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
   }
 
   function load(preset: Preset) {
-    // Volumes belong to the room and the headphones, not to the exercise.
-    onChange((prev) => ({ ...sanitizeSettings(preset.settings), mixer: prev.mixer }))
+    onChange((prev) => applyPreset(prev, preset.settings))
     report('list', `Loaded "${preset.name}".`)
   }
 
   function loadFactory(preset: FactoryPreset) {
-    const built = preset.build()
-    onChange((prev) => ({
-      ...built,
-      mixer: prev.mixer,
-      sounds: prev.sounds,
-      voice: { ...built.voice, pack: prev.voice.pack },
-      visual: prev.visual,
-    }))
+    onChange((prev) => applyFactoryPreset(prev, preset))
     report('factory', `Loaded "${preset.name}".`)
   }
 
@@ -445,6 +426,17 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
           ))}
         </ul>
         {statusFor('factory')}
+      </Panel>
+
+      <Panel
+        title="Stored data"
+        description="Everything is kept in this browser only. Clearing it removes your settings, presets, program templates and uploaded sounds, and restarts the app with factory defaults."
+      >
+        <div className="presets-panel__actions">
+          <Button variant="danger" size="sm" icon={<TrashIcon />} onClick={() => void clearAll()}>
+            Clear stored data
+          </Button>
+        </div>
       </Panel>
 
       <p role="status" className="sr-only">

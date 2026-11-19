@@ -39,7 +39,6 @@ function tabIndicator(tab: TabId, settings: Settings): string | null {
     case 'quick':
       return settings.program.enabled ||
         settings.gap.enabled ||
-        settings.randomMute.enabled ||
         settings.practice.enabled
         ? 'on'
         : null
@@ -113,8 +112,6 @@ export default function App() {
       update((prev) => ({ ...prev, tempoPercent: clampTempoPercent(prev.tempoPercent + delta) })),
     toggleMute: () => update((prev) => ({ ...prev, mixer: { ...prev.mixer, muted: !prev.mixer.muted } })),
     toggleSilence: () => update((prev) => ({ ...prev, gap: { ...prev.gap, enabled: !prev.gap.enabled } })),
-    toggleRandomMute: () =>
-      update((prev) => ({ ...prev, randomMute: { ...prev.randomMute, enabled: !prev.randomMute.enabled } })),
     toggleVoice: () => update((prev) => ({ ...prev, voice: { ...prev.voice, enabled: !prev.voice.enabled } })),
     toggleProgram: () => update((prev) => ({ ...prev, program: { ...prev.program, enabled: !prev.program.enabled } })),
     toggleSpeedTrainer: () =>
@@ -236,12 +233,12 @@ export default function App() {
                   onKeyDown={(e) => onTabKeyDown(e, index)}
                 >
                   {t.label}
-                  {indicator !== null && (
-                    <>
-                      <span className={`app__tab-dot app__tab-dot--${indicator}`} aria-hidden="true" />
-                      <span className="sr-only">({indicator})</span>
-                    </>
-                  )}
+                  {/* The dot always takes its space, so switching a feature on never resizes the tab bar. */}
+                  <span
+                    className={`app__tab-dot${indicator !== null ? ` app__tab-dot--${indicator}` : ' app__tab-dot--off'}`}
+                    aria-hidden="true"
+                  />
+                  {indicator !== null && <span className="sr-only">({indicator})</span>}
                 </button>
               )
             })}

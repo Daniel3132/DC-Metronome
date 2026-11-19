@@ -1,8 +1,9 @@
-import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { MAX_BPM, MAX_SECTION_BARS, MAX_SECTIONS, MIN_BPM } from '../../core/constants'
 import {
   clampBpm,
   createSection,
+  beatSeconds,
   effectiveBpm,
   makeId,
   rhythmDiffers,
@@ -10,31 +11,13 @@ import {
   selectSection,
   toCurrent,
 } from '../../core/settings'
-import type { BeatLevel, Section, Settings } from '../../core/types'
-import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, CopyIcon, PlusIcon, SaveIcon, TrashIcon } from '../icons/icons'
+import type { Section, Settings } from '../../core/types'
+import { ArrowDownIcon, ArrowUpIcon, CopyIcon, PlusIcon, SaveIcon, TrashIcon, XIcon } from '../icons/icons'
 import type { PanelProps } from '../panelTypes'
-import { Badge, Button, Field, IconButton, Panel, Stepper, Toggle } from '../ui/ui'
+import { Button, IconButton, Panel, Stepper, Toggle } from '../ui/ui'
+import { ProgramQuickEntry } from './ProgramQuickEntry'
 import { ProgramTemplates } from './ProgramTemplates'
 import './ProgramPanel.css'
-
-/** Remembers whether the program card is minimized (a per-browser convenience; failures are ignored). */
-const COLLAPSED_KEY = 'dcmetronome.ui.programCollapsed'
-
-function readCollapsed(): boolean {
-  try {
-    return globalThis.localStorage?.getItem(COLLAPSED_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-function writeCollapsed(collapsed: boolean): void {
-  try {
-    globalThis.localStorage?.setItem(COLLAPSED_KEY, collapsed ? '1' : '0')
-  } catch {
-    // Storage blocked or full: the card just opens expanded next time.
-  }
-}
 
 const NAME_MAX_LENGTH = 40
 
@@ -62,31 +45,8 @@ function formatDuration(seconds: number): string {
 }
 
 function sectionSeconds(section: Section, settings: Settings): number {
-  return (section.bars * section.beatsPerBar * 60) / effectiveBpm(section.tempo ?? settings.bpm, settings.tempoPercent)
-}
-
-function describeBeats(beats: readonly BeatLevel[]): string {
-  const at = (level: BeatLevel) => beats.flatMap((l, i) => (l === level ? [i + 1] : []))
-  const parts = (
-    [
-      ['accent on', at('accent')],
-      ['medium', at('medium')],
-      ['muted', at('mute')],
-    ] as const
-  )
-    .filter(([, list]) => list.length > 0)
-    .map(([name, list]) => `${name} ${list.join(', ')}`)
-  return `${plural(beats.length, 'beat')}${parts.length > 0 ? `: ${parts.join('; ')}` : ''}`
-}
-
-function AccentPreview({ beats }: { beats: readonly BeatLevel[] }) {
-  return (
-    <span className="program-panel__beats" role="img" aria-label={`Accents, ${describeBeats(beats)}`}>
-      {beats.map((level, i) => (
-        <span key={i} className={`program-panel__beat program-panel__beat--${level}`} />
-      ))}
-    </span>
-  )
+  const bpm = effectiveBpm(section.tempo ?? settings.bpm, settings.tempoPercent)
+  return section.bars * section.beatsPerBar * beatSeconds(bpm, section.beatUnit)
 }
 
 interface FocusRequest {
@@ -94,16 +54,25 @@ interface FocusRequest {
   select: boolean
 }
 
-export function ProgramPanel({ settings, onChange, metronome }: PanelProps) {
+interface ProgramPanelProps extends PanelProps {
+  /** Replaces the "Program" heading (the Quick tab puts its Program / Presets switch there). */
+  title?: ReactNode
+  /** Minimized: the header alone. Owned by the Quick tab, so Program and Presets share it. */
+  collapsed: boolean
+  /** Rendered at the end of the header (the minimize button). */
+  collapseButton?: ReactNode
+}
+
+export function ProgramPanel({
+  settings,
+  onChange,
+  metronome,
+  title = 'Program',
+  collapsed,
+  collapseButton,
+}: ProgramPanelProps) {
   const uid = useId()
   const [status, setStatus] = useState('')
-  const [collapsed, setCollapsed] = useState(readCollapsed)
-  const toggleCollapsed = () => {
-    setCollapsed((c) => {
-      writeCollapsed(!c)
-      return !c
-    })
-  }
   // Reordering moves DOM nodes (and can drop focus); the handler names the element to focus after the next commit.
   const focusRequest = useRef<FocusRequest | null>(null)
 
@@ -235,11 +204,20 @@ export function ProgramPanel({ settings, onChange, metronome }: PanelProps) {
   return (
     <Panel
       className={['program-panel', collapsed && 'is-collapsed'].filter(Boolean).join(' ')}
-      title="Program"
+      title={title}
       description={
-        collapsed
-          ? summary
-          : 'Sections play in order. Set the signature and subdivision above, then save them into the selected section.'
+        <>
+          <span className="tabular">{summary}</span>
+          {!program.enabled && <span> · off</span>}
+          {settings.practice.enabled && (
+            <span
+              className="program-panel__warn"
+              title="The speed trainer sets the tempo instead of the section tempos"
+            >
+              {' · speed trainer sets the tempo'}
+            </span>
+          )}
+        </>
       }
       headerAction={
         <>
@@ -260,44 +238,16 @@ export function ProgramPanel({ settings, onChange, metronome }: PanelProps) {
             checked={program.enabled}
             onChange={(enabled) => onChange((prev) => ({ ...prev, program: { ...prev.program, enabled } }))}
           />
-          <IconButton
-            size="sm"
-            variant="ghost"
-            className="program-panel__collapse"
-            label={collapsed ? 'Expand program' : 'Minimize program'}
-            aria-expanded={!collapsed}
-            icon={<ChevronDownIcon size={18} />}
-            onClick={toggleCollapsed}
-          />
+          {collapseButton}
         </>
       }
     >
       {!collapsed && (
         <>
-          <div className="program-panel__summary">
-            <span className="tabular">{summary}</span>
-            {program.enabled ? (
-              <Badge tone="accent">{program.loop ? 'Loops' : 'Plays once'}</Badge>
-            ) : (
-              <Badge>Program off</Badge>
-            )}
+          <div className="program-panel__tools">
+            <ProgramQuickEntry settings={settings} onChange={onChange} onStatus={setStatus} />
+            <ProgramTemplates settings={settings} onChange={onChange} onStatus={setStatus} />
           </div>
-
-          {!program.enabled && (
-            <p className="program-panel__note">
-              Program mode is off: the rhythm set above plays and loops. Section tempos apply in program mode.
-            </p>
-          )}
-          {settings.practice.enabled && (
-            <p className="program-panel__note program-panel__note--warning">
-              The speed trainer is on, so it sets the tempo instead of the section tempos.
-            </p>
-          )}
-          <p className="program-panel__note">
-            Pick a section to load its rhythm into the controls above. Changes reach the section only when you save it.
-          </p>
-
-          <ProgramTemplates settings={settings} onChange={onChange} onStatus={setStatus} />
 
           <ol className="program-panel__matrix" aria-label="Sections">
             {sections.map((section, index) => {
@@ -319,16 +269,18 @@ export function ProgramPanel({ settings, onChange, metronome }: PanelProps) {
                     }${isPlaying ? ', playing' : ''}`}
                     onClick={() => select(section)}
                   >
-                    <span className="program-panel__cell-head" aria-hidden="true">
+                    <span className="program-panel__cell-line program-panel__cell-line--head" aria-hidden="true">
                       <span className="program-panel__index tabular">{index + 1}</span>
                       <span className="program-panel__cell-name">{label}</span>
                     </span>
-                    <span className="program-panel__cell-meter tabular" aria-hidden="true">
-                      {section.beatsPerBar}/{section.beatUnit}
-                    </span>
-                    <span className="program-panel__cell-info tabular" aria-hidden="true">
-                      {bar !== null ? `bar ${bar}/${section.bars}` : plural(section.bars, 'bar')}
-                      {section.tempo !== null && ` · ${section.tempo} BPM`}
+                    <span className="program-panel__cell-line" aria-hidden="true">
+                      <span className="program-panel__cell-meter tabular">
+                        {section.beatsPerBar}/{section.beatUnit}
+                      </span>
+                      <span className="program-panel__cell-info tabular">
+                        {bar !== null ? `${bar}/${section.bars}` : `×${section.bars}`}
+                        {section.tempo !== null && ` @${section.tempo}`}
+                      </span>
                     </span>
                     <span className="program-panel__cell-beats" aria-hidden="true">
                       {section.beats.map((level, i) => (
@@ -341,13 +293,29 @@ export function ProgramPanel({ settings, onChange, metronome }: PanelProps) {
                       </span>
                     )}
                   </button>
+                  {/* A sibling of the cell (a button cannot hold another button), laid over its corner. */}
+                  <button
+                    type="button"
+                    className="program-panel__cell-delete"
+                    aria-label={`Delete ${label}`}
+                    title={sections.length <= 1 ? 'A program keeps at least one section' : `Delete ${label}`}
+                    disabled={sections.length <= 1}
+                    onClick={() => remove(section, index)}
+                  >
+                    <XIcon size={12} />
+                  </button>
                 </li>
               )
             })}
             <li className="program-panel__matrix-item">
-              <button type="button" className="program-panel__cell program-panel__cell--add" disabled={!canAdd} onClick={add}>
-                <PlusIcon size={20} />
-                {canAdd ? 'Add section' : `Up to ${MAX_SECTIONS} sections`}
+              <button
+                type="button"
+                className="program-panel__cell program-panel__cell--add"
+                disabled={!canAdd}
+                onClick={add}
+              >
+                <PlusIcon size={16} />
+                {canAdd ? 'Add' : `Max ${MAX_SECTIONS}`}
               </button>
             </li>
           </ol>
@@ -360,7 +328,7 @@ export function ProgramPanel({ settings, onChange, metronome }: PanelProps) {
               <h3 id={elId(editing, 'heading')} className="sr-only">
                 {`Edit section ${editIndex + 1}: ${editLabel}${editPlaying ? ', playing' : ''}`}
               </h3>
-              <div className="program-panel__head">
+              <div className="program-panel__editor">
                 <span className="program-panel__index tabular" aria-hidden="true">
                   {editIndex + 1}
                 </span>
@@ -382,74 +350,47 @@ export function ProgramPanel({ settings, onChange, metronome }: PanelProps) {
                     updateSection(editing.id, (s) => ({ ...s, name }))
                   }}
                 />
-                {editPlaying && pulse && (
-                  <Badge tone="accent" className="program-panel__bar tabular">
-                    {pulse.sectionBars === null ? 'Playing' : `Bar ${pulse.sectionBar + 1} / ${pulse.sectionBars}`}
-                  </Badge>
-                )}
-                {unsaved && (
-                  <Badge tone="warning" className="program-panel__unsaved">
-                    Unsaved
-                  </Badge>
-                )}
-                <Button
-                  size="sm"
-                  variant={unsaved ? 'primary' : 'secondary'}
-                  icon={<SaveIcon size={16} />}
-                  disabled={!unsaved}
-                  title={
-                    unsaved
-                      ? `Write the signature, accents and subdivision from the controls above into ${editLabel}`
-                      : `${editLabel} already matches the controls above`
-                  }
-                  onClick={save}
-                >
-                  Save section
-                </Button>
-              </div>
-
-              <div className="program-panel__fields">
                 <Stepper
-                  label="Bars"
+                  label={`Section ${editIndex + 1} bars`}
+                  hideLabel
+                  size="sm"
+                  suffix="bars"
                   value={editing.bars}
                   min={1}
                   max={MAX_SECTION_BARS}
                   onChange={(bars) => updateSection(editing.id, (s) => ({ ...s, bars }))}
                 />
-
-                <Field label="Tempo" hint={editing.tempo !== null ? undefined : `Uses the main tempo (${settings.bpm} BPM).`}>
-                  <div className="program-panel__tempo">
-                    <Toggle
-                      size="sm"
-                      label="Own tempo"
-                      checked={editing.tempo !== null}
-                      onChange={(on) =>
-                        updateSection(editing.id, (s) => ({ ...s, tempo: on ? clampBpm(settings.bpm) : null }))
-                      }
-                    />
-                    {editing.tempo !== null && (
-                      <Stepper
-                        hideLabel
-                        label={`Section ${editIndex + 1} tempo`}
-                        suffix="BPM"
-                        value={editing.tempo}
-                        min={MIN_BPM}
-                        max={MAX_BPM}
-                        onChange={(tempo) => updateSection(editing.id, (s) => ({ ...s, tempo }))}
-                      />
-                    )}
-                  </div>
-                </Field>
-              </div>
-
-              <div className="program-panel__foot">
-                <AccentPreview beats={editing.beats} />
-                <div className="program-panel__actions">
+                <span
+                  className="program-panel__tempo"
+                  title={editing.tempo !== null ? undefined : `Uses the main tempo (${settings.bpm} BPM)`}
+                >
+                  <Toggle
+                    size="sm"
+                    label="Tempo"
+                    checked={editing.tempo !== null}
+                    onChange={(on) =>
+                      updateSection(editing.id, (s) => ({ ...s, tempo: on ? clampBpm(settings.bpm) : null }))
+                    }
+                  />
+                  {/* Always there (greyed out with the main tempo when off), so switching it on moves nothing. */}
+                  <Stepper
+                    hideLabel
+                    size="sm"
+                    label={`Section ${editIndex + 1} tempo`}
+                    suffix="BPM"
+                    value={editing.tempo ?? clampBpm(settings.bpm)}
+                    min={MIN_BPM}
+                    max={MAX_BPM}
+                    disabled={editing.tempo === null}
+                    onChange={(tempo) => updateSection(editing.id, (s) => ({ ...s, tempo }))}
+                  />
+                </span>
+                <span className="program-panel__actions">
                   <IconButton
                     id={elId(editing, 'up')}
                     size="sm"
                     label={`Move ${editLabel} earlier`}
-                    icon={<ArrowUpIcon size={18} />}
+                    icon={<ArrowUpIcon size={16} />}
                     disabled={editIndex === 0}
                     onClick={() => move(editing, editIndex, -1)}
                   />
@@ -457,29 +398,42 @@ export function ProgramPanel({ settings, onChange, metronome }: PanelProps) {
                     id={elId(editing, 'down')}
                     size="sm"
                     label={`Move ${editLabel} later`}
-                    icon={<ArrowDownIcon size={18} />}
+                    icon={<ArrowDownIcon size={16} />}
                     disabled={editIndex === sections.length - 1}
                     onClick={() => move(editing, editIndex, 1)}
                   />
                   <IconButton
                     size="sm"
                     label={`Duplicate ${editLabel}`}
-                    icon={<CopyIcon size={18} />}
+                    icon={<CopyIcon size={16} />}
                     disabled={!canAdd}
                     onClick={() => duplicate(editing)}
                   />
                   <IconButton
                     size="sm"
                     label={`Delete ${editLabel}`}
-                    icon={<TrashIcon size={18} />}
+                    icon={<TrashIcon size={16} />}
                     disabled={sections.length <= 1}
                     onClick={() => remove(editing, editIndex)}
                   />
-                </div>
+                  <Button
+                    size="sm"
+                    variant={unsaved ? 'primary' : 'secondary'}
+                    icon={<SaveIcon size={16} />}
+                    disabled={!unsaved}
+                    title={
+                      unsaved
+                        ? `Write the signature, accents and subdivision from the controls above into ${editLabel}`
+                        : `${editLabel} already matches the controls above`
+                    }
+                    onClick={save}
+                  >
+                    {unsaved ? 'Save' : 'Saved'}
+                  </Button>
+                </span>
               </div>
             </div>
           </div>
-
         </>
       )}
       <p role="status" className="sr-only">

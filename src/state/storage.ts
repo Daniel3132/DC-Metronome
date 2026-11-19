@@ -1,3 +1,4 @@
+import { deleteCustomSoundsDb } from '../audio/customSounds'
 import { STORAGE_KEYS } from '../core/constants'
 import { createDefaultSettings, makeId, sanitizeSettings } from '../core/settings'
 import type { Section, Settings } from '../core/types'
@@ -28,7 +29,14 @@ function readJson(key: string): unknown {
   }
 }
 
+/** Every localStorage key of the app starts with this (settings, presets, templates, UI conveniences). */
+const KEY_PREFIX = 'dcmetronome.'
+
+/** Set once the stored data was cleared: later writes (e.g. the save on page hide) must not bring it back. */
+let cleared = false
+
 function writeJson(key: string, value: unknown): void {
+  if (cleared) return
   try {
     globalThis.localStorage?.setItem(key, JSON.stringify(value))
   } catch {
@@ -81,6 +89,27 @@ export function loadPresets(): Preset[] {
 /** Persist user presets. Swallows quota/availability errors. */
 export function savePresets(presets: Preset[]): void {
   writeJson(STORAGE_KEYS.presets, presets)
+}
+
+/**
+ * Erase everything the app stored in this browser: settings, presets, program templates, UI preferences
+ * (localStorage keys starting with "dcmetronome.") and uploaded sounds (IndexedDB). Settings changes made after
+ * this are no longer saved, so reload the page right after it to start from factory defaults.
+ */
+export async function clearStoredData(): Promise<void> {
+  cleared = true
+  try {
+    const storage = globalThis.localStorage
+    if (storage) {
+      const keys = Array.from({ length: storage.length }, (_, i) => storage.key(i)).filter(
+        (key): key is string => key?.startsWith(KEY_PREFIX) ?? false,
+      )
+      for (const key of keys) storage.removeItem(key)
+    }
+  } catch {
+    // Storage unavailable: nothing was stored there either.
+  }
+  await deleteCustomSoundsDb()
 }
 
 /** Program templates saved under STORAGE_KEYS.templates, sections sanitized; [] when absent or unreadable. */

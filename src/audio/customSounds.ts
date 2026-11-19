@@ -68,6 +68,29 @@ function openDb(): Promise<IDBDatabase> {
   return dbPromise
 }
 
+/**
+ * Delete the whole custom sound library (the IndexedDB database). Closes this tab's connection first so the delete is
+ * not blocked by it; resolves once deleted, or when another tab still holds the database open (it goes when that closes).
+ */
+export async function deleteCustomSoundsDb(): Promise<void> {
+  if (typeof indexedDB === 'undefined') return
+  const open = dbPromise
+  dbPromise = null
+  if (open) {
+    try {
+      ;(await open).close()
+    } catch {
+      // Never opened: nothing to close.
+    }
+  }
+  await new Promise<void>((resolve) => {
+    const request = indexedDB.deleteDatabase(DB_NAME)
+    request.onsuccess = () => resolve()
+    request.onerror = () => resolve()
+    request.onblocked = () => resolve()
+  })
+}
+
 /** Run one transaction; `body` issues requests and returns a getter for the result, read once it has committed. */
 async function withStore<T>(mode: IDBTransactionMode, body: (store: IDBObjectStore) => () => T): Promise<T> {
   const db = await openDb()

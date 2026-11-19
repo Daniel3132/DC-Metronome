@@ -42,7 +42,7 @@
 }
 
 .quick-controls__cell--accents {
-  flex-basis: 8rem;
+  flex-basis: 12rem;
 }
 
 .quick-controls__cell--rest {
@@ -120,14 +120,24 @@
   min-height: var(--control-sm);
 }
 
-/* Selects inside the cards are as wide as their content needs, never the whole card. */
-.quick-controls__accents {
-  width: 8.5rem;
-  max-width: 100%;
+/* Accent groupings vary in number and length (Plain, 2+2+3 …), so they flow instead of sitting in columns. */
+.ui-segmented.quick-controls__chips--accents {
+  display: flex;
+  flex-wrap: wrap;
 }
 
-.quick-controls__gap {
-  width: 6rem;
+.quick-controls__chips--accents .ui-segmented-item {
+  flex: 1 0 auto;
+  padding: 0 var(--space-2);
+}
+
+/* Custom cannot be picked (it is set on the pads), but when it applies it must read as selected. */
+.quick-controls__chips .ui-segmented-item:disabled[aria-checked='true'] {
+  opacity: 1;
+}
+
+.ui-segmented.quick-controls__chips--gap {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .quick-controls .ui-select-input {
@@ -144,24 +154,6 @@
 
 .quick-controls .ui-toggle {
   min-height: var(--control-sm);
-}
-
-/* Rest bar: random mute as a mini line under the gap pattern. */
-.quick-controls__random {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding-top: 6px;
-  border-top: 1px solid var(--border);
-}
-
-.quick-controls__random .ui-toggle-label {
-  font-size: var(--fs-sm);
-}
-
-.quick-controls__percent {
-  width: 5.25rem;
 }
 
 /* Speed trainer: four small steppers, 2 × 2 on narrow cards and on one line when the card is wide enough. */
@@ -189,6 +181,3 @@
   font-size: var(--fs-sm);
 }
 
-.quick-controls__cell .silence-status {
-  font-size: var(--fs-xs);
-}

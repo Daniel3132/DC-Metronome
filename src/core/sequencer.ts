@@ -8,7 +8,7 @@ import {
   SUB_VOICE_GAIN,
   getSubdivision,
 } from './constants'
-import { DEFAULT_BPM, clampBpm, effectiveBpm } from './settings'
+import { DEFAULT_BPM, beatSeconds, clampBpm, playedBpm } from './settings'
 import type {
   BeatLevel,
   GapSettings,
@@ -41,7 +41,9 @@ export interface SequencerOptions {
  *
  * Tempo resolution for each beat: base = practice.enabled ? practice tempo
  *   : program.enabled && section.tempo != null ? section.tempo : settings.bpm;
- *   bpm = effectiveBpm(base, tempoPercent). One beat (one `beatUnit` note) lasts 60 / bpm seconds.
+ *   bpm = playedBpm(base, tempoPercent, practice active): the speed trainer ignores the percentage.
+ *   The tempo counts quarter notes: one beat (one `beatUnit` note) lasts beatSeconds(bpm, beatUnit) = 60 / bpm × 4 / beatUnit,
+ *   so 3/8 plays twice as fast as 3/4 at the same BPM.
  *
  * Bars and sections:
  * - Outside program mode the section is `settings.activeSection`, re-read at every bar start; it loops forever.
@@ -168,6 +170,11 @@ function resolveSectionIndex(state: State, sections: readonly Section[]): number
   if (sections[state.sectionIndex]?.id === state.sectionId) return state.sectionIndex
   const byId = sections.findIndex((section) => section.id === state.sectionId)
   return byId >= 0 ? byId : clampIndex(state.sectionIndex, sections.length)
+}
+
+/** The speed trainer sets the tempo of the bar the state is in (so the percentage does not apply). */
+function practiceActive(state: State, settings: Settings): boolean {
+  return settings.practice.enabled && state.practice !== null
 }
 
 /** Tempo before the percentage, for the bar the state is in. */
@@ -350,7 +357,10 @@ function advance(state: State, settings: Settings): State {
   }
   if (s.pending) return { ...s, pending: false }
 
-  const spb = 60 / effectiveBpm(baseTempo(s, settings, section), settings.tempoPercent)
+  const spb = beatSeconds(
+    playedBpm(baseTempo(s, settings, section), settings.tempoPercent, practiceActive(s, settings)),
+    section.beatUnit,
+  )
   // A tempo change starts a new segment anchored so that the last pulse keeps its time and offset.
   const anchored = spb !== s.segSpb
   const segStart = anchored ? s.time - s.offset * spb : s.segStart
@@ -385,8 +395,8 @@ function pulseEvent(state: State, settings: Settings): PulseEvent {
   const section = sectionsOf(settings)[state.sectionIndex]
   const subdivision = getSubdivision(section.subdivision)
   const baseBpm = baseTempo(state, settings, section)
-  const bpm = effectiveBpm(baseBpm, settings.tempoPercent)
-  const beatDuration = 60 / bpm
+  const bpm = playedBpm(baseBpm, settings.tempoPercent, practiceActive(state, settings))
+  const beatDuration = beatSeconds(bpm, section.beatUnit)
   const following = subdivision.pulses[state.pulse + 1] ?? 1
   const level = levelOf(section, state.beat)
   const gapBar = state.gapBar && settings.gap.enabled

@@ -416,3 +416,69 @@
 .program-panel__head .ui-button {
   flex: none;
 }
+
+/* Quick entry: a whole program typed as text (3/8x3, 4/4x2). */
+.program-quick {
+  position: relative;
+}
+
+.program-quick__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.program-quick__input {
+  flex: 1 1 14rem;
+  min-width: 0;
+  min-height: var(--control-sm);
+  padding: 0 var(--space-3);
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
+  font-size: var(--fs-sm);
+}
+
+.program-quick__input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.program-quick__input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+/* The preview or error floats under the field while it is in use, so it never takes a row or moves the matrix. */
+.program-quick__preview {
+  position: absolute;
+  inset: calc(100% + 2px) 0 auto;
+  z-index: 5;
+  display: none;
+  padding: 3px var(--space-2);
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.program-quick:focus-within .program-quick__preview {
+  display: block;
+}
+
+.program-quick__preview.is-ok {
+  color: var(--success);
+}
+
+.program-quick__preview.is-error {
+  color: var(--danger);
+}

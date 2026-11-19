@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { MAX_BPM, MAX_TEMPO_PERCENT, MIN_BPM, MIN_TEMPO_PERCENT } from '../../core/constants'
 import { tempoMarking } from '../../core/meter'
-import { clampBpm, clampTempoPercent, effectiveBpm } from '../../core/settings'
+import { clampBpm, clampTempoPercent, playedBpm } from '../../core/settings'
 import type { Settings } from '../../core/types'
 import type { SettingsUpdater } from '../../state/useSettings'
 import { MinusIcon, PlusIcon, TrendDownIcon, TrendUpIcon } from '../icons/icons'
@@ -126,7 +126,8 @@ export function TempoControl({ settings, onChange, playingBpm, playingBaseBpm }:
   // While stopped, show what Start would play: the speed trainer and a program's first section tempo win over bpm.
   const firstSectionTempo = program.enabled ? sections[0]?.tempo ?? null : null
   const startBase = practice.enabled ? practice.startBpm : firstSectionTempo ?? bpm
-  const actual = playingBpm ?? effectiveBpm(startBase, tempoPercent)
+  // The speed trainer plays its tempo as set; the percentage only scales the other tempos.
+  const actual = playingBpm ?? playedBpm(startBase, tempoPercent, practice.enabled)
   const differs = Math.abs(actual - bpm) >= 0.05
 
   const base = playingBaseBpm ?? startBase
@@ -135,7 +136,7 @@ export function TempoControl({ settings, onChange, playingBpm, playingBaseBpm }:
     const parts: string[] = []
     if (practice.enabled) parts.push('speed trainer')
     else if (base !== bpm) parts.push('section tempo')
-    if (tempoPercent !== 100) parts.push(`${tempoPercent}%`)
+    if (tempoPercent !== 100 && !practice.enabled) parts.push(`${tempoPercent}%`)
     reason = parts.length > 0 ? parts.join(' · ') : null
   }
 
