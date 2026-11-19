@@ -7,7 +7,7 @@
  */
 export type BeatLevel = 'accent' | 'medium' | 'normal' | 'mute'
 
-/** Time signature denominator. The tempo (BPM) always counts this note value. */
+/** Time signature denominator. The tempo (BPM) always counts quarter notes, so an eighth-note beat is twice as fast. */
 export type BeatUnit = 2 | 4 | 8 | 16
 
 export type SubdivisionId =
@@ -229,7 +229,7 @@ export interface PulseEvent {
   silentReason: SilentReason | null
   /** True for every pulse of a bar silenced by the gap trainer. */
   gapBar: boolean
-  /** Effective tempo: base tempo × percentage, clamped to MIN_BPM..MAX_BPM. */
+  /** Effective tempo in quarter notes per minute: base tempo × percentage (not for the speed trainer), clamped to MIN_BPM..MAX_BPM. */
   bpm: number
   /** Tempo before the percentage is applied (practice tempo, section tempo or global tempo). */
   baseBpm: number

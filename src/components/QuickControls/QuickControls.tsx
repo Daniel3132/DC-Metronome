@@ -9,13 +9,12 @@ import {
   QUICK_SIGNATURES,
 } from '../../core/meter'
 import { defaultBeats, updateSectionById } from '../../core/settings'
-import type { BeatUnit, GapSettings, PracticeSettings, RandomMuteSettings, Section, Settings, SubdivisionId } from '../../core/types'
+import type { BeatUnit, GapSettings, PracticeSettings, Section, Settings, SubdivisionId } from '../../core/types'
 import type { SettingsUpdater } from '../../state/useSettings'
 import { MasterVolume } from '../MasterVolume/MasterVolume'
 import { RhythmNotation } from '../RhythmNotation/RhythmNotation'
-import { SilenceStatus } from '../SilenceStatus/SilenceStatus'
 import { SubdivisionPicker } from '../SubdivisionPicker/SubdivisionPicker'
-import { Segmented, Select, Stepper, Toggle, type SelectOption } from '../ui/ui'
+import { Segmented, Select, Stepper, Toggle, type SegmentedOption, type SelectOption } from '../ui/ui'
 import './QuickControls.css'
 
 interface QuickControlsProps {
@@ -39,7 +38,6 @@ const SUBDIVISION_CHIPS = COMMON_SUBDIVISIONS.map((id) => ({
 const SIGNATURE_CHIPS = COMMON_SIGNATURES.map((sig) => ({ value: sig as string, label: sig }))
 
 const GAP_PATTERNS = ['1:1', '2:1', '3:1', '4:1', '2:2', '4:4'] as const
-const RANDOM_PERCENTS = [10, 20, 25, 33, 50, 66, 75, 90] as const
 /** Value of the accents picker when the beats match no pattern (edited on the beat pads). */
 const CUSTOM = 'custom'
 
@@ -80,8 +78,7 @@ function Cell({ label, aside, kind, children }: CellProps) {
 }
 
 /**
- * The main tab's controls as a grid of small cells: signature, subdivision, accents, rest bar (gap trainer and random
- * mute), voice, volume
+ * The main tab's controls as a grid of small cells: signature, subdivision, accents, rest bar (gap trainer), voice, volume
  * and the speed trainer. Each shows the most used choices and a compact picker for the rest.
  */
 export function QuickControls({ settings, onChange, getLevel, active }: QuickControlsProps) {
@@ -93,8 +90,6 @@ export function QuickControls({ settings, onChange, getLevel, active }: QuickCon
     onChange((prev) => updateSectionById(prev, prev.current.id, fn))
   }
   const setGap = (patch: Partial<GapSettings>) => onChange((prev) => ({ ...prev, gap: { ...prev.gap, ...patch } }))
-  const setRandomMute = (patch: Partial<RandomMuteSettings>) =>
-    onChange((prev) => ({ ...prev, randomMute: { ...prev.randomMute, ...patch } }))
   const setPractice = (patch: Partial<PracticeSettings>) =>
     onChange((prev) => ({ ...prev, practice: { ...prev.practice, ...patch } }))
 
@@ -110,16 +105,18 @@ export function QuickControls({ settings, onChange, getLevel, active }: QuickCon
     updateSection((s) => ({ ...s, beatsPerBar: count, beatUnit: unit, beats: defaultBeats(count, unit) }))
   }
 
-  // Accents: plain (accent on 1 only) or a grouping; hand-edited pads show as Custom.
+  // Accents: plain (accent on 1 only) or a grouping, as chips; hand-edited pads light up the Custom chip. Custom is
+  // always there (it cannot be picked, only reached on the pads) so the chips do not move when it applies.
   const matching = matchingAccentGrouping(section.beats)
   const accentValue = matching ? groupingKey(matching) : CUSTOM
-  const accentOptions = withCurrent(
-    accentGroupings(section.beatsPerBar).map(
-      (g): SelectOption<string> => ({ value: groupingKey(g), label: g.length === 1 ? `Plain (${g[0]})` : groupingKey(g) }),
-    ),
-    accentValue,
-    'Custom',
-  )
+  const accentChips: SegmentedOption<string>[] = [
+    ...accentGroupings(section.beatsPerBar).map((g) => ({
+      value: groupingKey(g),
+      label: g.length === 1 ? 'Plain' : groupingKey(g),
+      title: g.length === 1 ? `Plain: accent on 1 only` : `Accents grouped ${groupingKey(g)}`,
+    })),
+    { value: CUSTOM, label: 'Custom', title: 'Set on the beat pads (click a pad to change it)', disabled: true },
+  ]
   const setGrouping = (key: string) => {
     if (key === CUSTOM) return
     const groups = key.split('+').map(Number)
@@ -128,22 +125,14 @@ export function QuickControls({ settings, onChange, getLevel, active }: QuickCon
 
   const setSubdivision = (subdivision: SubdivisionId) => updateSection((s) => ({ ...s, subdivision }))
 
-  const gapValue = `${gap.playBars}:${gap.muteBars}`
-  const gapOptions = withCurrent(
-    GAP_PATTERNS.map((pattern): SelectOption<string> => {
-      const [play, mute] = pattern.split(':').map(Number)
-      return { value: pattern, label: gapLabel(play, mute) }
-    }),
-    gapValue,
-    gapLabel(gap.playBars, gap.muteBars),
-  )
-
-  const percentValue = String(settings.randomMute.percent)
-  const percentOptions = withCurrent(
-    RANDOM_PERCENTS.map((p): SelectOption<string> => ({ value: String(p), label: `${p} %` })),
-    percentValue,
-    `${percentValue} %`,
-  )
+  const gapValue = gapLabel(gap.playBars, gap.muteBars)
+  // A pattern set elsewhere (a preset) is added as an extra chip so the current value always shows.
+  const gapChips: SegmentedOption<string>[] = (
+    (GAP_PATTERNS as readonly string[]).includes(gapValue) ? [...GAP_PATTERNS] : [...GAP_PATTERNS, gapValue]
+  ).map((pattern) => {
+    const [play, mute] = pattern.split(':').map(Number)
+    return { value: pattern, label: pattern, title: `Play ${play} bar${play === 1 ? '' : 's'}, rest ${mute}` }
+  })
 
   return (
     <section className="quick-controls" aria-label="Quick controls">
@@ -197,12 +186,13 @@ export function QuickControls({ settings, onChange, getLevel, active }: QuickCon
         </Cell>
 
         <Cell kind="accents" label="Accents">
-          <Select
-            className="quick-controls__accents"
+          <Segmented
+            className="quick-controls__chips quick-controls__chips--accents"
             label="Accent pattern"
-            hideLabel
+            size="sm"
+            wrap
             value={accentValue}
-            options={accentOptions}
+            options={accentChips}
             onChange={setGrouping}
           />
         </Cell>
@@ -220,34 +210,18 @@ export function QuickControls({ settings, onChange, getLevel, active }: QuickCon
             />
           }
         >
-          <Select
-            className="quick-controls__gap"
+          <Segmented
+            className="quick-controls__chips quick-controls__chips--gap"
             label="Bars played : bars of rest"
-            hideLabel
+            size="sm"
+            wrap
             value={gapValue}
-            options={gapOptions}
+            options={gapChips}
             onChange={(pattern) => {
               const [playBars, muteBars] = pattern.split(':').map(Number)
               setGap({ playBars, muteBars })
             }}
           />
-          <div className="quick-controls__random" title="Randomly drops whole beats">
-            <Toggle
-              size="sm"
-              label="Random"
-              checked={settings.randomMute.enabled}
-              onChange={(enabled) => setRandomMute({ enabled })}
-            />
-            <Select
-              className="quick-controls__percent"
-              label="Share of beats dropped at random"
-              hideLabel
-              value={percentValue}
-              options={percentOptions}
-              onChange={(value) => setRandomMute({ percent: Number(value) })}
-            />
-          </div>
-          <SilenceStatus gap={gap} randomMute={settings.randomMute} />
         </Cell>
 
         <Cell

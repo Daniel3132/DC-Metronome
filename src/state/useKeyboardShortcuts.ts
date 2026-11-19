@@ -10,7 +10,6 @@ export interface ShortcutHandlers {
   toggleMute: () => void
   /** Gap trainer on/off. */
   toggleSilence: () => void
-  toggleRandomMute: () => void
   toggleVoice: () => void
   toggleProgram: () => void
   toggleSpeedTrainer: () => void
@@ -41,7 +40,6 @@ export const SHORTCUTS: readonly ShortcutInfo[] = [
   { keys: ['−'], description: 'Tempo % −5' },
   { keys: ['M'], description: 'Mute / unmute' },
   { keys: ['S'], description: 'Rest bar (gap trainer) on / off' },
-  { keys: ['R'], description: 'Random mute on / off' },
   { keys: ['V'], description: 'Voice counting on / off' },
   { keys: ['P'], description: 'Program mode on / off' },
   { keys: ['A'], description: 'Speed trainer on / off' },
@@ -93,7 +91,6 @@ type ToggleHandler = {
 const TOGGLES: Readonly<Partial<Record<string, ToggleHandler>>> = {
   m: 'toggleMute',
   s: 'toggleSilence',
-  r: 'toggleRandomMute',
   v: 'toggleVoice',
   p: 'toggleProgram',
   a: 'toggleSpeedTrainer',

@@ -498,7 +498,7 @@ describe('sanitizeSettings', () => {
       current: { ...createSection({ beatsPerBar: 5, beatUnit: 8, subdivision: 'swing', bars: 3, tempo: 90 }), id: CURRENT_SECTION_ID },
       program: { enabled: true, loop: false },
       gap: { enabled: true, playBars: 64, muteBars: 64 },
-      randomMute: { enabled: true, percent: 100 },
+      randomMute: { enabled: false, percent: 100 },
       practice: { enabled: true, startBpm: 300, targetBpm: MIN_BPM, stepBpm: 50, everyBars: 64, atTarget: 'stop' },
       sounds: { accent: 'bell', medium: 'cowbell', beat: 'custom:x', sub: 'kick' },
       voice: { enabled: true, pack: 'en-female', subdivisions: true, clicks: false },

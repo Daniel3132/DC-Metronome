@@ -8,7 +8,8 @@
 
 .beat-grid__header {
   display: flex;
-  flex-wrap: wrap;
+  /* One line: the "Silent bar" badge and section name come and go while playing without moving the pads. */
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);

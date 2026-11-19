@@ -5,25 +5,75 @@
   min-width: 0;
 }
 
-/* Program, a size smaller than in its own tab: small controls, small cells, only the warnings as notes. */
-.main-panel .program-panel {
-  --control-md: 32px;
-  --control-sm: 30px;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
+/* ---- The lower card (Program or Presets): compact, every row as short as it can be ---- */
+
+.main-panel .program-panel,
+.main-panel .quick-presets {
+  --control-md: 30px;
+  --control-sm: 28px;
+  gap: 6px;
+  padding: 6px var(--space-3);
 }
 
-.main-panel .program-panel .ui-panel-body {
-  gap: var(--space-2);
+.main-panel .program-panel .ui-panel-body,
+.main-panel .quick-presets .ui-panel-body {
+  gap: 6px;
 }
 
-.main-panel .program-panel .ui-panel-header {
+/* Header: the Program / Presets switch, the summary right after it on the same line, controls at the end. */
+.main-panel .program-panel .ui-panel-header,
+.main-panel .quick-presets .ui-panel-header {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--space-2);
   min-height: var(--control-sm);
 }
 
-/* Minimized: the header alone, with the program summary as its subtitle. */
-.main-panel .program-panel.is-collapsed .ui-panel-description {
+.main-panel .program-panel .ui-panel-titles,
+.main-panel .quick-presets .ui-panel-titles {
+  display: flex;
+  flex: 1 1 12rem;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.main-panel .ui-panel-title:has(.main-panel__views) {
+  display: flex;
+  flex: none;
+  font-size: inherit;
+}
+
+.main-panel__views .ui-segmented-item {
+  font-size: var(--fs-sm);
+}
+
+.main-panel .program-panel .ui-panel-description,
+.main-panel .quick-presets .ui-panel-description {
   display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.main-panel .ui-panel-action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.main-panel__collapse svg {
+  transform: rotate(180deg);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.is-collapsed .main-panel__collapse svg {
+  transform: none;
 }
 
 /* Loop, then a divider, then the program on/off switch. */
@@ -37,117 +87,227 @@
   font-size: var(--fs-sm);
 }
 
-.program-panel__collapse svg {
-  transform: rotate(180deg);
-  transition: transform var(--dur-fast) var(--ease-out);
+.program-panel__warn {
+  color: var(--warning);
 }
 
-.program-panel.is-collapsed .program-panel__collapse svg {
-  transform: none;
+/* ---- Program body ---- */
+
+/* Text entry and templates share one row (two on narrow screens). */
+.program-panel__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--space-3);
 }
 
-.main-panel .program-panel .ui-panel-description,
-.main-panel .program-panel__note:not(.program-panel__note--warning),
-.main-panel .program-panel .ui-field-hint {
-  display: none;
+.program-panel__tools .program-quick {
+  flex: 2 1 22rem;
+  min-width: 0;
 }
 
-.main-panel .program-panel__summary {
-  font-size: var(--fs-xs);
+.program-panel__tools .program-quick__row {
+  flex-wrap: nowrap;
 }
 
-.main-panel .program-panel__matrix {
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-  gap: var(--space-1);
+.program-panel__tools .program-quick__input {
+  flex: 1 1 auto;
+  width: 0;
 }
 
-.main-panel .program-panel__cell {
-  gap: 3px;
-  padding: var(--space-1) var(--space-2) var(--space-2);
-  border-radius: var(--radius-sm);
+.program-panel__tools .program-templates {
+  flex: 1 1 auto;
 }
 
-.main-panel .program-panel__cell .program-panel__index {
-  width: 18px;
-  height: 18px;
+.program-panel__tools .program-templates__select {
+  width: 10rem;
 }
 
-.main-panel .program-panel__cell-name {
-  font-size: var(--fs-xs);
-}
-
-.main-panel .program-panel__cell-meter {
-  font-size: var(--fs-lg);
-}
-
-.main-panel .program-panel__cell-beats {
-  min-height: 14px;
-}
-
-.main-panel .program-panel__cell--add {
-  min-height: 72px;
-  font-size: var(--fs-xs);
-}
-
-.main-panel .program-panel__section {
-  padding: var(--space-2);
-}
-
-.main-panel .program-panel__group {
-  gap: var(--space-2);
-}
-
-.main-panel .program-panel__index {
-  width: 24px;
-  height: 24px;
-  font-size: var(--fs-xs);
-}
-
-.main-panel .program-panel__name {
-  font-size: var(--fs-sm);
-}
-
-.main-panel .program-panel__fields {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr));
-  gap: var(--space-2) var(--space-3);
-}
-
-.main-panel .program-panel .ui-field-label {
-  font-size: var(--fs-xs);
-}
-
-.main-panel .program-panel .ui-stepper {
-  gap: 2px;
-}
-
-.main-panel .program-panel .ui-stepper-input,
 .main-panel .program-panel .ui-select-input,
+.main-panel .program-panel .ui-stepper-input,
 .main-panel .program-panel .ui-toggle-label {
   font-size: var(--fs-sm);
 }
 
-.main-panel .program-panel__unit {
-  width: 4.5rem;
+/* Matrix: small two-line cells (index, meter, bars, tempo / accents, name). */
+.main-panel .program-panel__matrix {
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: var(--space-1);
 }
 
-.main-panel .program-panel__foot {
-  padding-top: var(--space-2);
+.main-panel .program-panel__cell {
+  gap: 4px;
+  padding: 6px var(--space-2) 8px;
+  border-radius: var(--radius-sm);
 }
 
-/* Program fields keep their natural width instead of stretching across the column (a 300 px "Bars" stepper). */
-.main-panel .program-panel__fields > * {
-  justify-self: start;
-  max-width: 100%;
+/* Delete (x) over the top-right corner of a cell; the first line leaves room for it. */
+.program-panel__matrix-item {
+  position: relative;
 }
 
-.main-panel .program-panel__fields .ui-select {
-  width: 10rem;
-  max-width: 100%;
+.main-panel .program-panel__cell-line--head {
+  padding-right: 18px;
+}
+
+.program-panel__cell-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  opacity: 0.7;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out);
+}
+
+.program-panel__cell-delete:disabled {
+  visibility: hidden;
+}
+
+@media (hover: hover) {
+  .program-panel__cell-delete:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+    opacity: 1;
+  }
+}
+
+.program-panel__cell-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.main-panel .program-panel__cell .program-panel__index {
+  width: 20px;
+  height: 20px;
+  font-size: 0.6875rem;
+}
+
+.main-panel .program-panel__cell-meter {
+  font-size: var(--fs-xl);
+  letter-spacing: 0;
+}
+
+.main-panel .program-panel__cell-info {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.main-panel .program-panel__cell-name {
+  flex: 1 1 auto;
+  font-size: var(--fs-xs);
+}
+
+.main-panel .program-panel__cell-beats {
+  flex: none;
+  flex-wrap: nowrap;
+  min-height: 14px;
+  gap: 2px;
+}
+
+.main-panel .program-panel__cell-beats .program-panel__beat {
+  width: 5px;
+}
+
+.main-panel .program-panel__cell-beats .program-panel__beat--accent {
+  height: 14px;
+}
+
+.main-panel .program-panel__cell-beats .program-panel__beat--medium {
+  height: 11px;
+}
+
+.main-panel .program-panel__cell-beats .program-panel__beat--normal {
+  height: 8px;
+}
+
+.main-panel .program-panel__cell-beats .program-panel__beat--mute {
+  height: 5px;
+}
+
+.main-panel .program-panel__cell--add {
+  gap: var(--space-1);
+  min-height: 0;
+  font-size: var(--fs-xs);
+}
+
+/* Editor of the selected section: one row (wraps on narrow screens). */
+.main-panel .program-panel__section {
+  padding: 6px var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.program-panel__editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--space-2);
+  min-width: 0;
+}
+
+.main-panel .program-panel__editor .program-panel__index {
+  width: 22px;
+  height: 22px;
+  font-size: var(--fs-xs);
+}
+
+.main-panel .program-panel__name {
+  flex: 0 1 10rem;
+  width: auto;
+  min-height: var(--control-sm);
+  font-size: var(--fs-sm);
+}
+
+.main-panel .program-panel__editor .ui-stepper {
+  flex: none;
+  gap: 2px;
+}
+
+.main-panel .program-panel__tempo {
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+  min-height: var(--control-sm);
+}
+
+.main-panel .program-panel__actions {
+  flex: 0 0 auto;
+  gap: 2px;
+  margin-inline-start: auto;
+}
+
+.main-panel .program-panel__actions > :first-child {
+  margin-inline-end: 0;
+}
+
+.main-panel .program-panel__actions .ui-button {
+  margin-inline-start: var(--space-1);
+}
+
+/* ---- Presets body ---- */
+
+.main-panel .quick-presets__save {
+  flex: 0 1 18rem;
+  min-width: 0;
 }
 
 /*
- * Desktop: the page never scrolls. The quick controls keep their height and the program card takes what is left;
- * when it holds more sections than fit, only its contents scroll.
+ * Desktop: the page never scrolls. The quick controls keep their height and the lower card takes what is left;
+ * when it holds more than fits, only its contents scroll.
  */
 @media (min-width: 900px) {
   .main-panel {
@@ -160,16 +320,19 @@
   }
 
   /* Shrinks (and scrolls inside) when space runs out, but never stretches into an empty card. */
-  .main-panel .program-panel:not(.is-collapsed) {
+  .main-panel .program-panel:not(.is-collapsed),
+  .main-panel .quick-presets:not(.is-collapsed) {
     flex: 0 1 auto;
-    min-height: 8rem;
+    min-height: 7rem;
   }
 
-  .main-panel .program-panel .ui-panel-header {
+  .main-panel .program-panel .ui-panel-header,
+  .main-panel .quick-presets .ui-panel-header {
     flex: none;
   }
 
-  .main-panel .program-panel .ui-panel-body {
+  .main-panel .program-panel .ui-panel-body,
+  .main-panel .quick-presets .ui-panel-body {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
@@ -180,7 +343,13 @@
     padding: 2px var(--space-2) 2px 2px;
   }
 
-  .main-panel .program-panel .ui-panel-body > * {
+  .main-panel .program-panel .ui-panel-body > *,
+  .main-panel .quick-presets .ui-panel-body > * {
     flex-shrink: 0;
   }
+}
+
+/* Minimized: nothing but the header (the screen-reader status line takes no room either). */
+.main-panel .is-collapsed .ui-panel-body {
+  display: contents;
 }

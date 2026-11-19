@@ -101,11 +101,11 @@ export function matchingGrouping(beats: readonly BeatLevel[]): number[] | null {
 }
 
 /** Time signatures offered as one-tap choices. */
-export const COMMON_SIGNATURES = ['2/4', '3/4', '4/4', '5/4', '6/8', '7/8', '9/8', '12/8'] as const
+export const COMMON_SIGNATURES = ['1/4', '2/4', '3/4', '4/4', '5/4', '6/8', '7/8', '9/8'] as const
 
 /** A longer list for the compact signature picker. */
 export const QUICK_SIGNATURES = [
-  '2/4', '3/4', '4/4', '5/4', '6/4', '7/4', '2/2', '3/8', '5/8', '6/8', '7/8', '9/8', '11/8', '12/8',
+  '1/4', '2/4', '3/4', '4/4', '5/4', '6/4', '7/4', '2/2', '3/8', '5/8', '6/8', '7/8', '9/8', '11/8', '12/8',
 ] as const
 
 // Lower bound (inclusive) of each marking; a common simplification of the overlapping traditional ranges.
