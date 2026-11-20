@@ -20,6 +20,9 @@ export const MAX_GAP_BARS = 64
 export const MAX_PRACTICE_EVERY_BARS = 64
 export const MAX_PRACTICE_STEP = 50
 export const MAX_SECTIONS = 64
+/** Parts (e.g. a bar of 2/4 then a bar of 4/4) in one section. */
+export const MAX_SECTION_PARTS = 16
+export const MAX_SECTION_REPEATS = 99
 
 export const BEAT_UNITS: readonly BeatUnit[] = [2, 4, 8, 16]
 
@@ -110,5 +113,8 @@ export function voiceSampleUrl(pack: VoicePackId, word: VoiceWord): string {
 export const STORAGE_KEYS = {
   settings: 'dcmetronome.settings.v1',
   presets: 'dcmetronome.presets.v1',
+  /** Program templates from older versions; moved into the presets on first load. */
   templates: 'dcmetronome.templates.v1',
+  /** Accent color of the theme picker (a display preference, not part of the settings). */
+  accent: 'dcmetronome.accent.v1',
 } as const

@@ -3,15 +3,16 @@ import type {
   MixerSettings,
   PlaybackSnapshot,
   PulseEvent,
-  Settings,
+  PlaybackSettings,
   SoundId,
   SoundRole,
   VoicePackId,
   VoiceWord,
 } from '../core/types'
-import { BUILT_IN_SOUNDS, CUSTOM_SOUND_PREFIX, getSubdivision } from '../core/constants'
+import { sectionAnnouncement } from '../core/announce'
+import { BUILT_IN_SOUNDS, CUSTOM_SOUND_PREFIX, VOICE_PACKS, getSubdivision } from '../core/constants'
 import { createSequencer, type Sequencer } from '../core/sequencer'
-import { createDefaultSettings } from '../core/settings'
+import { createDefaultPlaybackSettings } from '../core/settings'
 import { getCustomSoundData } from './customSounds'
 import { renderBuiltInSound } from './sounds'
 import { loadVoicePack } from './voice'
@@ -133,11 +134,10 @@ function audioContextClass(): typeof AudioContext | undefined {
  * Seconds a spoken word may last: until the next spoken pulse when subdivisions are spoken, otherwise the beat.
  * Computed from the section's subdivision pattern so unspoken pulses (e.g. odd 32nds) do not shorten the window.
  */
-function voiceWindow(pulse: PulseEvent, settings: Settings): number {
+function voiceWindow(pulse: PulseEvent, settings: PlaybackSettings): number {
   if (!settings.voice.subdivisions || pulse.pulsesInBeat < 2) return pulse.beatDuration
-  const section = settings.sections[pulse.sectionIndex]
-  const pattern = section ? getSubdivision(section.subdivision) : null
-  if (!pattern || pattern.pulses.length !== pulse.pulsesInBeat) return pulse.duration
+  const pattern = getSubdivision(pulse.subdivision)
+  if (pattern.pulses.length !== pulse.pulsesInBeat) return pulse.duration
   let next = 1
   for (let i = pulse.pulse + 1; i < pattern.pulses.length; i++) {
     if (pattern.words[i] !== null) {
@@ -217,7 +217,7 @@ export class MetronomeEngine {
   private graph: Graph | null = null
   /** The context that already received the silent unlock buffer (iOS). */
   private unlocked: AudioContext | null = null
-  private settings: Settings | null = null
+  private settings: PlaybackSettings | null = null
   private snapshot: PlaybackSnapshot = INITIAL_SNAPSHOT
   private readonly listeners = new Set<() => void>()
 
@@ -236,6 +236,8 @@ export class MetronomeEngine {
   private idleTimer: ReturnType<typeof setTimeout> | null = null
 
   private readonly sounding = new Set<Sounding>()
+  /** Section announcements waiting for their pulse to be heard (speech synthesis cannot be scheduled ahead). */
+  private readonly announceTimers = new Set<ReturnType<typeof setTimeout>>()
   private lastWord: Sounding | null = null
 
   /** Built-in buffers keyed `${soundId}|${role}`. */
@@ -254,7 +256,7 @@ export class MetronomeEngine {
   private visibilityBound = false
 
   /** Replace the live settings. Cheap when nothing relevant changed; starts loading sounds/voices the settings need. */
-  setSettings(settings: Settings): void {
+  setSettings(settings: PlaybackSettings): void {
     const previous = this.settings
     if (previous === settings) return
     this.settings = settings
@@ -442,8 +444,8 @@ export class MetronomeEngine {
     if (error === MESSAGES.blocked || error === MESSAGES.sound || error === MESSAGES.word) this.publish({ error: null })
   }
 
-  private currentSettings(): Settings {
-    this.settings ??= createDefaultSettings()
+  private currentSettings(): PlaybackSettings {
+    this.settings ??= createDefaultPlaybackSettings()
     return this.settings
   }
 
@@ -582,7 +584,7 @@ export class MetronomeEngine {
   // --- Buffers ---
 
   /** Start loading (and render built-ins) for everything the settings use. Never rejects. */
-  private prepare(settings: Settings): Promise<unknown> {
+  private prepare(settings: PlaybackSettings): Promise<unknown> {
     const loads: Promise<void>[] = []
     for (const role of ROLES) {
       const id = settings.sounds[role]
@@ -712,7 +714,7 @@ export class MetronomeEngine {
     }
   }
 
-  private fill(sequencer: Sequencer, settings: Settings, now: number): void {
+  private fill(sequencer: Sequencer, settings: PlaybackSettings, now: number): void {
     const horizon = now + LOOK_AHEAD
     for (let count = 0; count < MAX_PULSES_PER_TICK; count++) {
       const time = sequencer.peekTime(settings)
@@ -731,12 +733,13 @@ export class MetronomeEngine {
       // instead of firing a burst of stale pulses, fast-forward through them silently. The sequencer keeps
       // counting, so the beat grid, program position and practice tempo stay where they would have been.
       if (pulse.time < now - STALE_AFTER) continue
+      this.announce(pulse, settings)
       this.playPulse(pulse, settings)
       this.queue.push(pulse)
     }
   }
 
-  private playPulse(pulse: PulseEvent, settings: Settings): void {
+  private playPulse(pulse: PulseEvent, settings: PlaybackSettings): void {
     if (pulse.silent) return
     let spoken = false
     if (pulse.voice !== null && pulse.voiceGain > 0) {
@@ -751,6 +754,32 @@ export class MetronomeEngine {
     if (!click || pulse.role === null || pulse.gain <= 0) return
     const buffer = this.clickBuffer(settings.sounds[pulse.role], pulse.role)
     if (buffer) this.play(buffer, pulse.role, pulse.time, pulse.gain)
+  }
+
+  /**
+   * Speak a section name (sectionAnnouncement) with the browser's speech synthesis, since the voice packs only hold
+   * the count words. Speech starts when the pulse is heard; volume follows master × voice, nothing when muted.
+   */
+  private announce(pulse: PulseEvent, settings: PlaybackSettings): void {
+    const ctx = this.ctx
+    if (!ctx || typeof speechSynthesis === 'undefined') return
+    const text = sectionAnnouncement(pulse, settings)
+    if (text === null) return
+    const delayMs = Math.max(0, (pulse.time + outputLatency(ctx) - ctx.currentTime) * 1000)
+    const timer = setTimeout(() => {
+      this.announceTimers.delete(timer)
+      const { mixer, voice } = this.currentSettings()
+      const volume = mixer.muted ? 0 : Math.min(1, mixer.master * mixer.voice)
+      if (this.snapshot.status !== 'playing' || volume <= 0) return
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.lang = VOICE_PACKS.find((p) => p.id === voice.pack)?.lang ?? 'en'
+      utterance.volume = volume
+      utterance.rate = 1.1
+      // A previous announcement still talking (short sections at a fast tempo) gives way to the new one.
+      speechSynthesis.cancel()
+      speechSynthesis.speak(utterance)
+    }, delayMs)
+    this.announceTimers.add(timer)
   }
 
   private play(buffer: AudioBuffer, channel: Channel, when: number, gain: number, rate = 1): Sounding | null {
@@ -834,6 +863,9 @@ export class MetronomeEngine {
     this.sequenceEnded = false
     this.lastPulse = null
     this.queue = []
+    for (const timer of this.announceTimers) clearTimeout(timer)
+    this.announceTimers.clear()
+    if (silence && typeof speechSynthesis !== 'undefined') speechSynthesis.cancel()
     if (silence && this.ctx) {
       const now = this.ctx.currentTime
       for (const node of this.sounding) this.cut(node, now)

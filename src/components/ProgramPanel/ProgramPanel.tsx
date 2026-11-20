@@ -1,39 +1,71 @@
-import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { MAX_BPM, MAX_SECTION_BARS, MAX_SECTIONS, MIN_BPM } from '../../core/constants'
+import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import {
-  clampBpm,
-  createSection,
+  MAX_BPM,
+  MAX_SECTION_BARS,
+  MAX_SECTION_PARTS,
+  MAX_SECTION_REPEATS,
+  MAX_SECTIONS,
+  MIN_BPM,
+} from '../../core/constants'
+import {
   beatSeconds,
+  clampBpm,
+  createPart,
+  createSection,
+  editedPart,
   effectiveBpm,
+  findPart,
   makeId,
-  rhythmDiffers,
-  saveCurrentToSection,
+  sectionBars,
+  selectPart,
   selectSection,
-  toCurrent,
 } from '../../core/settings'
-import type { Section, Settings } from '../../core/types'
-import { ArrowDownIcon, ArrowUpIcon, CopyIcon, PlusIcon, SaveIcon, TrashIcon, XIcon } from '../icons/icons'
+import type { Part, Section, Settings } from '../../core/types'
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  CheckIcon,
+  CopyIcon,
+  GripIcon,
+  PlusIcon,
+  TrashIcon,
+  XIcon,
+} from '../icons/icons'
 import type { PanelProps } from '../panelTypes'
 import { Button, IconButton, Panel, Stepper, Toggle } from '../ui/ui'
 import { ProgramQuickEntry } from './ProgramQuickEntry'
-import { ProgramTemplates } from './ProgramTemplates'
+import { useReorder } from './useReorder'
 import './ProgramPanel.css'
 
 const NAME_MAX_LENGTH = 40
+
+/** What the disabled editor shows while no section is selected. */
+const PLACEHOLDER_SECTION: Section = {
+  id: 'none',
+  name: '',
+  parts: [{ id: 'none', beatsPerBar: 4, beatUnit: 4, beats: ['accent', 'normal', 'normal', 'normal'], subdivision: 'quarter', bars: 1 }],
+  repeats: 1,
+  tempo: null,
+}
+/** Parts drawn in a matrix cell; longer sections end in "…". */
+const CELL_PARTS = 3
 
 function sectionLabel(section: Section, index: number): string {
   return section.name.trim() || `Section ${index + 1}`
 }
 
-/** Keeps the same section selected after the list changed; falls back to the slot it was in. */
-function keepActive(prev: Settings, sections: Section[]): number {
-  const activeId = prev.sections[prev.activeSection]?.id
-  const index = sections.findIndex((s) => s.id === activeId)
-  return index >= 0 ? index : Math.max(0, Math.min(prev.activeSection, sections.length - 1))
-}
-
 function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? '' : 's'}`
+}
+
+function meterOf(part: Part): string {
+  return `${part.beatsPerBar}/${part.beatUnit}`
+}
+
+/** "4/4", or "2/4 then 4/4 ×3" for screen readers. */
+function describeParts(section: Section): string {
+  const parts = section.parts.map((p) => (p.bars === 1 ? meterOf(p) : `${p.bars} bars of ${meterOf(p)}`)).join(' then ')
+  return section.repeats > 1 ? `${parts}, ${section.repeats} times` : parts
 }
 
 function formatDuration(seconds: number): string {
@@ -46,7 +78,25 @@ function formatDuration(seconds: number): string {
 
 function sectionSeconds(section: Section, settings: Settings): number {
   const bpm = effectiveBpm(section.tempo ?? settings.bpm, settings.tempoPercent)
-  return section.bars * section.beatsPerBar * beatSeconds(bpm, section.beatUnit)
+  const pass = section.parts.reduce((sum, p) => sum + p.bars * p.beatsPerBar * beatSeconds(bpm, p.beatUnit), 0)
+  return pass * section.repeats
+}
+
+function moveItem<T>(list: T[], from: number, to: number): T[] {
+  if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return list
+  return list.toSpliced(from, 1).toSpliced(to, 0, list[from])
+}
+
+function updateSection(settings: Settings, id: string, update: (section: Section) => Section): Settings {
+  return { ...settings, sections: settings.sections.map((s) => (s.id === id ? update(s) : s)) }
+}
+
+/** Alt+arrow on a focused cell or part moves it: -1 earlier, +1 later, 0 not a move key. */
+function moveKey(e: KeyboardEvent): -1 | 0 | 1 {
+  if (!e.altKey) return 0
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') return -1
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') return 1
+  return 0
 }
 
 interface FocusRequest {
@@ -63,6 +113,11 @@ interface ProgramPanelProps extends PanelProps {
   collapseButton?: ReactNode
 }
 
+/**
+ * The program: a matrix of sections in play order (drag to reorder, click to select, click again to deselect) and an
+ * editor for the selected one. A section is one or more parts (a bar of 2/4, then a bar of 4/4 …) repeated a number
+ * of times. The quick controls above edit the selected part directly; with nothing selected they edit the free rhythm.
+ */
 export function ProgramPanel({
   settings,
   onChange,
@@ -86,79 +141,96 @@ export function ProgramPanel({
   })
 
   const { sections, program } = settings
-  const elId = (section: Section, part: string) => `${uid}-${section.id}-${part}`
+  const elId = (id: string, part: string) => `${uid}-${id}-${part}`
+  const selected = findPart(settings, settings.selected)
+  const editing = selected?.section ?? null
+  const editIndex = selected?.sectionIndex ?? -1
+  const editPartIndex = selected?.partIndex ?? 0
 
   const { playback } = metronome
   const pulse = playback.status === 'playing' ? playback.pulse : null
-  // Outside program mode the engine plays the working rhythm, not a section.
-  const playingIndex = pulse && program.enabled ? pulse.sectionIndex : -1
+  // Program mode plays the sections; outside it the selected section loops (and the free rhythm plays when none is).
+  const playingIndex = pulse && (program.enabled || selected) ? pulse.sectionIndex : -1
 
-  const totalBars = sections.reduce((sum, s) => sum + s.bars, 0)
+  const totalBars = sections.reduce((sum, s) => sum + sectionBars(s), 0)
   const totalSeconds = sections.reduce((sum, s) => sum + sectionSeconds(s, settings), 0)
   const canAdd = sections.length < MAX_SECTIONS
 
-  function updateSection(id: string, update: (section: Section) => Section) {
-    onChange((prev) => ({ ...prev, sections: prev.sections.map((s) => (s.id === id ? update(s) : s)) }))
+  function moveSection(from: number, to: number) {
+    onChange((prev) => ({ ...prev, sections: moveItem(prev.sections, from, to) }))
+    const section = sections[from]
+    if (section) setStatus(`Moved ${sectionLabel(section, from)} to position ${to + 1}.`)
   }
 
-  function move(section: Section, index: number, delta: -1 | 1) {
+  function movePart(sectionId: string, from: number, to: number) {
+    onChange((prev) => updateSection(prev, sectionId, (s) => ({ ...s, parts: moveItem(s.parts, from, to) })))
+    setStatus(`Moved part ${from + 1} to position ${to + 1}.`)
+  }
+
+  const sectionDrag = useReorder(sections.length, moveSection)
+  const partDrag = useReorder(editing?.parts.length ?? 0, (from, to) => {
+    if (editing) movePart(editing.id, from, to)
+  })
+
+  /** Move by one with the buttons or Alt+arrows; focus follows the moved cell, or stays on the move buttons. */
+  function stepSection(index: number, delta: -1 | 1, focus: 'cell' | 'buttons') {
     const to = index + delta
-    if (to < 0 || to >= sections.length) return
-    onChange((prev) => {
-      const from = prev.sections.findIndex((s) => s.id === section.id)
-      const target = from + delta
-      if (from < 0 || target < 0 || target >= prev.sections.length) return prev
-      const next = prev.sections.toSpliced(from, 1).toSpliced(target, 0, prev.sections[from])
-      return { ...prev, sections: next, activeSection: keepActive(prev, next) }
-    })
-    // At either end the button that was used becomes disabled, so focus its opposite.
-    const atEdge = to === 0 || to === sections.length - 1
-    const part = delta < 0 ? (atEdge ? 'down' : 'up') : atEdge ? 'up' : 'down'
-    focusRequest.current = { id: elId(section, part), select: false }
+    const section = sections[index]
+    if (!section || to < 0 || to >= sections.length) return
+    moveSection(index, to)
+    if (focus === 'cell') {
+      focusRequest.current = { id: elId(section.id, 'cell'), select: false }
+    } else {
+      // At either end the button that was used becomes disabled, so focus its opposite.
+      const atEdge = to === 0 || to === sections.length - 1
+      const part = delta < 0 ? (atEdge ? 'down' : 'up') : atEdge ? 'up' : 'down'
+      focusRequest.current = { id: elId(section.id, part), select: false }
+    }
   }
 
-  /** Keeps the working rhythm in step with the selection when a list change selects another section. */
-  function withSelection(prev: Settings, next: Section[], activeSection: number): Settings {
-    const changed = next[activeSection]?.id !== prev.sections[prev.activeSection]?.id
-    return changed
-      ? { ...prev, sections: next, activeSection, current: toCurrent(next[activeSection]) }
-      : { ...prev, sections: next, activeSection }
-  }
-
-  function duplicate(section: Section) {
+  function duplicate(section: Section, index: number) {
     if (!canAdd) return
+    const parts = section.parts.map((p) => ({ ...p, id: makeId(), beats: [...p.beats] }))
     const copy: Section = {
       ...section,
       id: makeId(),
       name: section.name.trim() ? `${section.name.trim()} copy`.slice(0, NAME_MAX_LENGTH) : '',
-      beats: [...section.beats],
+      parts,
     }
+    const partIndex = selected?.section.id === section.id ? selected.partIndex : 0
     onChange((prev) => {
       if (prev.sections.length >= MAX_SECTIONS) return prev
       const from = prev.sections.findIndex((s) => s.id === section.id)
       const at = from < 0 ? prev.sections.length : from + 1
-      return withSelection(prev, prev.sections.toSpliced(at, 0, copy), at)
+      const next = { ...prev, sections: prev.sections.toSpliced(at, 0, copy) }
+      return selectPart(next, { section: copy.id, part: parts[Math.min(partIndex, parts.length - 1)].id })
     })
-    focusRequest.current = { id: elId(copy, 'name'), select: true }
-    setStatus(`Added ${sectionLabel(copy, sections.indexOf(section) + 1)}.`)
+    focusRequest.current = { id: elId(copy.id, 'name'), select: true }
+    setStatus(`Added a copy of ${sectionLabel(section, index)}.`)
   }
 
   function remove(section: Section, index: number) {
-    if (sections.length <= 1) return
     onChange((prev) => {
-      if (prev.sections.length <= 1) return prev
-      const next = prev.sections.filter((s) => s.id !== section.id)
-      return withSelection(prev, next, keepActive(prev, next))
+      const next = { ...prev, sections: prev.sections.filter((s) => s.id !== section.id) }
+      return prev.selected?.section === section.id ? selectPart(next, null) : next
     })
     const neighbour = sections[index + 1] ?? sections[index - 1]
-    if (neighbour) focusRequest.current = { id: elId(neighbour, 'name'), select: false }
+    focusRequest.current = { id: neighbour ? elId(neighbour.id, 'cell') : elId('program', 'add'), select: false }
     setStatus(`Deleted ${sectionLabel(section, index)}.`)
   }
 
-  /** A new section from the working rhythm (signature, accents and subdivision set in the quick controls). */
+  function clearAll() {
+    if (sections.length === 0) return
+    if (!window.confirm(`Delete all ${plural(sections.length, 'section')} of the program?`)) return
+    onChange((prev) => ({ ...prev, sections: [], selected: null }))
+    focusRequest.current = { id: elId('program', 'add'), select: false }
+    setStatus('Deleted all sections.')
+  }
+
+  /** A new section from the rhythm being edited (signature, accents and subdivision from the quick controls), selected. */
   function add() {
     if (!canAdd) return
-    const { beatsPerBar, beatUnit, beats, subdivision } = settings.current
+    const { beatsPerBar, beatUnit, beats, subdivision } = editedPart(settings)
     const section = createSection({
       name: `Section ${sections.length + 1}`,
       beatsPerBar,
@@ -169,18 +241,75 @@ export function ProgramPanel({
     onChange((prev) =>
       prev.sections.length >= MAX_SECTIONS
         ? prev
-        : { ...prev, sections: [...prev.sections, section], activeSection: prev.sections.length },
+        : selectPart(
+            { ...prev, sections: [...prev.sections, section] },
+            { section: section.id, part: section.parts[0].id },
+          ),
     )
-    focusRequest.current = { id: elId(section, 'name'), select: true }
+    focusRequest.current = { id: elId(section.id, 'name'), select: true }
     setStatus(`Added ${section.name}.`)
   }
 
-  /** Selecting a section loads its rhythm into the quick controls (unsaved edits to the previous one are dropped). */
-  function select(section: Section) {
+  /** Clicking a section selects it (the quick controls then edit it); clicking the selected one selects none. */
+  function toggleSelect(section: Section, index: number) {
+    const deselect = settings.selected?.section === section.id
     onChange((prev) => {
-      const active = prev.sections.findIndex((s) => s.id === section.id)
-      return active < 0 || active === prev.activeSection ? prev : selectSection(prev, active)
+      const at = prev.sections.findIndex((s) => s.id === section.id)
+      if (at < 0) return prev
+      return prev.selected?.section === section.id ? selectPart(prev, null) : selectSection(prev, at)
     })
+    setStatus(deselect ? 'No section selected: the controls edit the free rhythm.' : `Editing ${sectionLabel(section, index)}.`)
+  }
+
+  function deselect() {
+    if (editing) focusRequest.current = { id: elId(editing.id, 'cell'), select: false }
+    onChange((prev) => selectPart(prev, null))
+    setStatus('No section selected: the controls edit the free rhythm.')
+  }
+
+  function addPart(section: Section) {
+    if (section.parts.length >= MAX_SECTION_PARTS) return
+    const base = section.parts[editPartIndex] ?? section.parts[section.parts.length - 1]
+    const part = createPart({
+      beatsPerBar: base.beatsPerBar,
+      beatUnit: base.beatUnit,
+      beats: [...base.beats],
+      subdivision: base.subdivision,
+      bars: 1,
+    })
+    const at = editPartIndex + 1
+    onChange((prev) => {
+      const next = updateSection(prev, section.id, (s) =>
+        s.parts.length >= MAX_SECTION_PARTS ? s : { ...s, parts: s.parts.toSpliced(Math.min(at, s.parts.length), 0, part) },
+      )
+      return selectPart(next, { section: section.id, part: part.id })
+    })
+    focusRequest.current = { id: elId(part.id, 'part'), select: false }
+    setStatus(`Added part ${at + 1}: pick its signature above.`)
+  }
+
+  function removePart(section: Section, index: number) {
+    if (section.parts.length <= 1) return
+    const part = section.parts[index]
+    onChange((prev) => {
+      const next = updateSection(prev, section.id, (s) =>
+        s.parts.length <= 1 ? s : { ...s, parts: s.parts.filter((p) => p.id !== part.id) },
+      )
+      if (prev.selected?.part !== part.id) return next
+      const parts = next.sections.find((s) => s.id === section.id)?.parts ?? []
+      const neighbour = parts[Math.min(index, parts.length - 1)]
+      return neighbour ? selectPart(next, { section: section.id, part: neighbour.id }) : next
+    })
+    const neighbour = section.parts[index + 1] ?? section.parts[index - 1]
+    focusRequest.current = { id: elId(neighbour.id, 'part'), select: false }
+    setStatus(`Removed part ${index + 1}.`)
+  }
+
+  function stepPart(section: Section, index: number, delta: -1 | 1) {
+    const to = index + delta
+    if (to < 0 || to >= section.parts.length) return
+    movePart(section.id, index, to)
+    focusRequest.current = { id: elId(section.parts[index].id, 'part'), select: false }
   }
 
   const summary = [
@@ -189,17 +318,12 @@ export function ProgramPanel({
     `about ${formatDuration(totalSeconds)}`,
   ].join(' · ')
 
-  // The matrix picks the section; one editor below shows it.
-  const editIndex = Math.min(Math.max(0, settings.activeSection), sections.length - 1)
-  const editing = sections[editIndex]
-  const editLabel = sectionLabel(editing, editIndex)
-  const editPlaying = editIndex === playingIndex
-  const unsaved = rhythmDiffers(settings.current, editing)
-
-  function save() {
-    onChange(saveCurrentToSection)
-    setStatus(`Saved ${editLabel}.`)
-  }
+  const editLabel = editing ? sectionLabel(editing, editIndex) : ''
+  // With nothing selected the editor still shows (disabled), from a placeholder, so selecting causes no jump.
+  const shown = editing ?? PLACEHOLDER_SECTION
+  const shownPart = shown.parts[editing ? editPartIndex : 0] ?? shown.parts[0]
+  const editPlaying = editIndex >= 0 && editIndex === playingIndex
+  const playingPart = editPlaying && pulse ? pulse.partIndex : -1
 
   return (
     <Panel
@@ -246,50 +370,92 @@ export function ProgramPanel({
         <>
           <div className="program-panel__tools">
             <ProgramQuickEntry settings={settings} onChange={onChange} onStatus={setStatus} />
-            <ProgramTemplates settings={settings} onChange={onChange} onStatus={setStatus} />
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<TrashIcon size={16} />}
+              disabled={sections.length === 0}
+              title="Delete every section of the program"
+              onClick={clearAll}
+            >
+              Clear all
+            </Button>
           </div>
 
-          <ol className="program-panel__matrix" aria-label="Sections">
+          <ol
+            className={['program-panel__matrix', sectionDrag.from !== null && 'is-sorting'].filter(Boolean).join(' ')}
+            aria-label="Sections (drag to reorder, Alt+arrow keys move the focused one)"
+          >
             {sections.map((section, index) => {
               const label = sectionLabel(section, index)
               const isActive = index === editIndex
               const isPlaying = index === playingIndex
+              const total = sectionBars(section)
               const bar = isPlaying && pulse && pulse.sectionBars !== null ? pulse.sectionBar + 1 : null
+              const shown = section.parts.slice(0, CELL_PARTS)
+              const meters = shown.map(meterOf).join(' + ') + (section.parts.length > CELL_PARTS ? ' …' : '')
               return (
-                <li key={section.id} className="program-panel__matrix-item">
+                <li
+                  key={section.id}
+                  className={['program-panel__matrix-item', sectionDrag.itemClass(index)].filter(Boolean).join(' ')}
+                  {...sectionDrag.itemProps(index)}
+                >
                   <button
                     type="button"
+                    id={elId(section.id, 'cell')}
                     className={['program-panel__cell', isActive && 'is-active', isPlaying && 'is-playing']
                       .filter(Boolean)
                       .join(' ')}
                     aria-pressed={isActive}
                     aria-current={isPlaying ? 'step' : undefined}
-                    aria-label={`${index + 1}. ${label}: ${section.beatsPerBar}/${section.beatUnit}, ${plural(section.bars, 'bar')}${
+                    aria-label={`${index + 1}. ${label}: ${describeParts(section)}, ${plural(total, 'bar')}${
                       section.tempo !== null ? `, ${section.tempo} BPM` : ''
                     }${isPlaying ? ', playing' : ''}`}
-                    onClick={() => select(section)}
+                    title={isActive ? 'Click to stop editing this section' : 'Click to edit, drag to reorder'}
+                    onClick={() => {
+                      if (!sectionDrag.consumeClick()) toggleSelect(section, index)
+                    }}
+                    onKeyDown={(e) => {
+                      const delta = moveKey(e)
+                      if (delta === 0) return
+                      e.preventDefault()
+                      stepSection(index, delta, 'cell')
+                    }}
                   >
                     <span className="program-panel__cell-line program-panel__cell-line--head" aria-hidden="true">
                       <span className="program-panel__index tabular">{index + 1}</span>
                       <span className="program-panel__cell-name">{label}</span>
                     </span>
+                    {sections.length > 1 && <GripIcon size={14} className="program-panel__grip" />}
                     <span className="program-panel__cell-line" aria-hidden="true">
-                      <span className="program-panel__cell-meter tabular">
-                        {section.beatsPerBar}/{section.beatUnit}
-                      </span>
-                      <span className="program-panel__cell-info tabular">
-                        {bar !== null ? `${bar}/${section.bars}` : `×${section.bars}`}
-                        {section.tempo !== null && ` @${section.tempo}`}
+                      <span
+                        className={`program-panel__cell-meter tabular${section.parts.length > 1 ? ' is-multi' : ''}`}
+                      >
+                        {meters}
                       </span>
                     </span>
+                    <span className="program-panel__cell-info tabular" aria-hidden="true">
+                      {section.repeats > 1 && (
+                        <span className="program-panel__repeat tabular">×{section.repeats}</span>
+                      )}
+                      {bar !== null ? `bar ${bar}/${total}` : plural(total, 'bar')}
+                      {section.tempo !== null && ` @${section.tempo}`}
+                    </span>
                     <span className="program-panel__cell-beats" aria-hidden="true">
-                      {section.beats.map((level, i) => (
-                        <span key={i} className={`program-panel__beat program-panel__beat--${level}`} />
+                      {shown.map((part, p) => (
+                        <span
+                          key={part.id}
+                          className={`program-panel__cell-part${isPlaying && pulse?.partIndex === p ? ' is-playing' : ''}`}
+                        >
+                          {part.beats.map((level, i) => (
+                            <span key={i} className={`program-panel__beat program-panel__beat--${level}`} />
+                          ))}
+                        </span>
                       ))}
                     </span>
                     {bar !== null && (
                       <span className="program-panel__cell-progress" aria-hidden="true">
-                        <span style={{ '--progress': bar / section.bars } as CSSProperties} />
+                        <span style={{ '--progress': bar / total } as CSSProperties} />
                       </span>
                     )}
                   </button>
@@ -298,8 +464,7 @@ export function ProgramPanel({
                     type="button"
                     className="program-panel__cell-delete"
                     aria-label={`Delete ${label}`}
-                    title={sections.length <= 1 ? 'A program keeps at least one section' : `Delete ${label}`}
-                    disabled={sections.length <= 1}
+                    title={`Delete ${label}`}
                     onClick={() => remove(section, index)}
                   >
                     <XIcon size={12} />
@@ -310,8 +475,10 @@ export function ProgramPanel({
             <li className="program-panel__matrix-item">
               <button
                 type="button"
+                id={elId('program', 'add')}
                 className="program-panel__cell program-panel__cell--add"
                 disabled={!canAdd}
+                title="Add a section with the rhythm set above"
                 onClick={add}
               >
                 <PlusIcon size={16} />
@@ -321,55 +488,69 @@ export function ProgramPanel({
           </ol>
 
           <div
-            key={editing.id}
-            className={['program-panel__section', editPlaying && 'is-playing'].filter(Boolean).join(' ')}
+            key={shown.id}
+            className={['program-panel__section', editPlaying && 'is-playing', !editing && 'is-disabled']
+              .filter(Boolean)
+              .join(' ')}
+            // Nothing selected: the same controls, greyed out and out of reach, so selecting moves nothing.
+            inert={!editing}
+            aria-disabled={!editing || undefined}
           >
-            <div role="group" aria-labelledby={elId(editing, 'heading')} className="program-panel__group">
-              <h3 id={elId(editing, 'heading')} className="sr-only">
-                {`Edit section ${editIndex + 1}: ${editLabel}${editPlaying ? ', playing' : ''}`}
+            <div role="group" aria-labelledby={elId(shown.id, 'heading')} className="program-panel__group">
+              <h3 id={elId(shown.id, 'heading')} className="sr-only">
+                {editing
+                  ? `Edit section ${editIndex + 1}: ${editLabel}${editPlaying ? ', playing' : ''}`
+                  : 'No section selected'}
               </h3>
               <div className="program-panel__editor">
                 <span className="program-panel__index tabular" aria-hidden="true">
-                  {editIndex + 1}
+                  {editing ? editIndex + 1 : '–'}
                 </span>
-                <label className="sr-only" htmlFor={elId(editing, 'name')}>
+                <label className="sr-only" htmlFor={elId(shown.id, 'name')}>
                   {`Section ${editIndex + 1} name`}
                 </label>
                 <input
-                  id={elId(editing, 'name')}
+                  id={elId(shown.id, 'name')}
                   className="program-panel__name"
                   type="text"
-                  value={editing.name}
-                  placeholder={`Section ${editIndex + 1}`}
+                  value={shown.name}
+                  placeholder={editing ? `Section ${editIndex + 1}` : 'No section selected'}
                   maxLength={NAME_MAX_LENGTH}
                   autoComplete="off"
                   spellCheck={false}
                   enterKeyHint="done"
                   onChange={(e) => {
                     const name = e.currentTarget.value
-                    updateSection(editing.id, (s) => ({ ...s, name }))
+                    onChange((prev) => updateSection(prev, shown.id, (s) => ({ ...s, name })))
                   }}
                 />
-                <Stepper
-                  label={`Section ${editIndex + 1} bars`}
-                  hideLabel
-                  size="sm"
-                  suffix="bars"
-                  value={editing.bars}
-                  min={1}
-                  max={MAX_SECTION_BARS}
-                  onChange={(bars) => updateSection(editing.id, (s) => ({ ...s, bars }))}
-                />
+                <span className="program-panel__repeats" title="Times the parts are played through">
+                  <span className="program-panel__field-label" aria-hidden="true">
+                    Repeat
+                  </span>
+                  <Stepper
+                    label={`Section ${editIndex + 1} repeats`}
+                    hideLabel
+                    size="sm"
+                    suffix="×"
+                    value={shown.repeats}
+                    min={1}
+                    max={MAX_SECTION_REPEATS}
+                    onChange={(repeats) => onChange((prev) => updateSection(prev, shown.id, (s) => ({ ...s, repeats })))}
+                  />
+                </span>
                 <span
                   className="program-panel__tempo"
-                  title={editing.tempo !== null ? undefined : `Uses the main tempo (${settings.bpm} BPM)`}
+                  title={shown.tempo !== null ? undefined : `Uses the main tempo (${settings.bpm} BPM)`}
                 >
                   <Toggle
                     size="sm"
                     label="Tempo"
-                    checked={editing.tempo !== null}
+                    checked={shown.tempo !== null}
                     onChange={(on) =>
-                      updateSection(editing.id, (s) => ({ ...s, tempo: on ? clampBpm(settings.bpm) : null }))
+                      onChange((prev) =>
+                        updateSection(prev, shown.id, (s) => ({ ...s, tempo: on ? clampBpm(prev.bpm) : null })),
+                      )
                     }
                   />
                   {/* Always there (greyed out with the main tempo when off), so switching it on moves nothing. */}
@@ -378,59 +559,143 @@ export function ProgramPanel({
                     size="sm"
                     label={`Section ${editIndex + 1} tempo`}
                     suffix="BPM"
-                    value={editing.tempo ?? clampBpm(settings.bpm)}
+                    value={shown.tempo ?? clampBpm(settings.bpm)}
                     min={MIN_BPM}
                     max={MAX_BPM}
-                    disabled={editing.tempo === null}
-                    onChange={(tempo) => updateSection(editing.id, (s) => ({ ...s, tempo }))}
+                    disabled={shown.tempo === null}
+                    onChange={(tempo) => onChange((prev) => updateSection(prev, shown.id, (s) => ({ ...s, tempo })))}
                   />
                 </span>
                 <span className="program-panel__actions">
                   <IconButton
-                    id={elId(editing, 'up')}
+                    id={elId(shown.id, 'up')}
                     size="sm"
                     label={`Move ${editLabel} earlier`}
                     icon={<ArrowUpIcon size={16} />}
                     disabled={editIndex === 0}
-                    onClick={() => move(editing, editIndex, -1)}
+                    onClick={() => stepSection(editIndex, -1, 'buttons')}
                   />
                   <IconButton
-                    id={elId(editing, 'down')}
+                    id={elId(shown.id, 'down')}
                     size="sm"
                     label={`Move ${editLabel} later`}
                     icon={<ArrowDownIcon size={16} />}
                     disabled={editIndex === sections.length - 1}
-                    onClick={() => move(editing, editIndex, 1)}
+                    onClick={() => stepSection(editIndex, 1, 'buttons')}
                   />
                   <IconButton
                     size="sm"
                     label={`Duplicate ${editLabel}`}
                     icon={<CopyIcon size={16} />}
                     disabled={!canAdd}
-                    onClick={() => duplicate(editing)}
+                    onClick={() => duplicate(shown, editIndex)}
                   />
                   <IconButton
                     size="sm"
                     label={`Delete ${editLabel}`}
                     icon={<TrashIcon size={16} />}
-                    disabled={sections.length <= 1}
-                    onClick={() => remove(editing, editIndex)}
+                    onClick={() => remove(shown, editIndex)}
                   />
                   <Button
                     size="sm"
-                    variant={unsaved ? 'primary' : 'secondary'}
-                    icon={<SaveIcon size={16} />}
-                    disabled={!unsaved}
-                    title={
-                      unsaved
-                        ? `Write the signature, accents and subdivision from the controls above into ${editLabel}`
-                        : `${editLabel} already matches the controls above`
-                    }
-                    onClick={save}
+                    variant="secondary"
+                    icon={<CheckIcon size={16} />}
+                    title="Stop shown this section: the controls above go back to the free rhythm"
+                    onClick={deselect}
                   >
-                    {unsaved ? 'Save' : 'Saved'}
+                    Done
                   </Button>
                 </span>
+              </div>
+
+              <div className="program-panel__parts-row">
+                <span className="program-panel__field-label" aria-hidden="true">
+                  Parts
+                </span>
+                <ol
+                  className={['program-panel__parts', partDrag.from !== null && 'is-sorting'].filter(Boolean).join(' ')}
+                  aria-label={`Parts of ${editLabel}, played in order (drag to reorder)`}
+                >
+                  {shown.parts.map((part, index) => {
+                    const isSelected = index === editPartIndex
+                    const isPlaying = index === playingPart
+                    return (
+                      <li
+                        key={part.id}
+                        className={['program-panel__part-item', partDrag.itemClass(index)].filter(Boolean).join(' ')}
+                        {...partDrag.itemProps(index)}
+                      >
+                        <button
+                          type="button"
+                          id={elId(part.id, 'part')}
+                          className={['program-panel__part', isSelected && 'is-active', isPlaying && 'is-playing']
+                            .filter(Boolean)
+                            .join(' ')}
+                          aria-pressed={isSelected}
+                          aria-label={`Part ${index + 1}: ${plural(part.bars, 'bar')} of ${meterOf(part)}${isPlaying ? ', playing' : ''}`}
+                          title={shown.parts.length > 1 ? 'Click to edit, drag to reorder' : undefined}
+                          onClick={() => {
+                            if (partDrag.consumeClick()) return
+                            onChange((prev) => selectPart(prev, { section: shown.id, part: part.id }))
+                          }}
+                          onKeyDown={(e) => {
+                            const delta = moveKey(e)
+                            if (delta === 0) return
+                            e.preventDefault()
+                            stepPart(shown, index, delta)
+                          }}
+                        >
+                          <span className="program-panel__part-meter tabular">{meterOf(part)}</span>
+                          <span className="program-panel__part-bars tabular">×{part.bars}</span>
+                        </button>
+                        {shown.parts.length > 1 && (
+                          <button
+                            type="button"
+                            className="program-panel__part-delete"
+                            aria-label={`Remove part ${index + 1}`}
+                            title={`Remove part ${index + 1}`}
+                            onClick={() => removePart(shown, index)}
+                          >
+                            <XIcon size={10} />
+                          </button>
+                        )}
+                      </li>
+                    )
+                  })}
+                  <li className="program-panel__part-item">
+                    <button
+                      type="button"
+                      className="program-panel__part program-panel__part--add"
+                      disabled={shown.parts.length >= MAX_SECTION_PARTS}
+                      title={
+                        shown.parts.length >= MAX_SECTION_PARTS
+                          ? `A section has at most ${MAX_SECTION_PARTS} parts`
+                          : 'Add a part after the selected one (e.g. a bar in another signature)'
+                      }
+                      onClick={() => addPart(shown)}
+                    >
+                      <PlusIcon size={14} />
+                      Part
+                    </button>
+                  </li>
+                </ol>
+                <Stepper
+                  label={`Part ${editPartIndex + 1} bars`}
+                  hideLabel
+                  size="sm"
+                  suffix={shownPart.bars === 1 ? 'bar' : 'bars'}
+                  value={shownPart.bars}
+                  min={1}
+                  max={MAX_SECTION_BARS}
+                  onChange={(bars) =>
+                    onChange((prev) =>
+                      updateSection(prev, shown.id, (s) => ({
+                        ...s,
+                        parts: s.parts.map((p) => (p.id === shownPart.id ? { ...p, bars } : p)),
+                      })),
+                    )
+                  }
+                />
               </div>
             </div>
           </div>

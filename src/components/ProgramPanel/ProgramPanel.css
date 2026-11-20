@@ -369,46 +369,6 @@
   }
 }
 
-/* Templates: pick, load, delete, and "Save template" pushed to the end of the line. */
-.program-templates {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.program-templates__select {
-  width: 13rem;
-  max-width: 100%;
-}
-
-.program-templates__select .ui-select-input {
-  min-height: var(--control-sm);
-  font-size: var(--fs-sm);
-}
-
-.program-templates__save {
-  margin-inline-start: auto;
-}
-
-.program-templates__name {
-  flex: 1 1 12rem;
-  min-width: 0;
-  min-height: var(--control-sm);
-  padding: 0 var(--space-3);
-  background: var(--surface-1);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  font-size: var(--fs-sm);
-}
-
-.program-templates__name:focus-visible {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-
 .program-panel__unsaved {
   flex: none;
 }
@@ -481,4 +441,250 @@
 
 .program-quick__preview.is-error {
   color: var(--danger);
+}
+
+/* ---- Sections made of parts ---- */
+
+/* Several meters in one cell ("2/4 + 4/4"): smaller, cut with an ellipsis when they do not fit. */
+.program-panel__cell-meter.is-multi {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.program-panel__repeat {
+  flex: none;
+  margin-inline-end: 4px;
+  padding: 0 5px;
+  background: var(--accent-soft);
+  border-radius: var(--radius-pill);
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+}
+
+/* Accent preview per part, with a thin divider between parts. */
+.program-panel__cell-part {
+  display: inline-flex;
+  flex: none;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.program-panel__cell-part + .program-panel__cell-part {
+  margin-left: 2px;
+  padding-left: 4px;
+  border-left: 1px solid var(--border-strong);
+}
+
+/* While a section plays, the parts not sounding fade back. */
+.program-panel__cell.is-playing .program-panel__cell-part:not(.is-playing) {
+  opacity: 0.45;
+}
+
+.program-panel__grip {
+  position: absolute;
+  right: 4px;
+  bottom: 6px;
+  color: var(--text-muted);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .program-panel__cell:hover .program-panel__grip {
+    opacity: 0.9;
+  }
+}
+
+.program-panel__field-label {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.program-panel__repeats {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.program-panel__parts-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--space-2);
+  min-width: 0;
+}
+
+.program-panel__parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.program-panel__part-item {
+  position: relative;
+  display: flex;
+}
+
+.program-panel__part {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-height: var(--control-sm);
+  padding: 4px var(--space-2) 0;
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-med) var(--ease-out);
+}
+
+/* Room for the remove (x) button laid over the right end. */
+.program-panel__part-item:has(.program-panel__part-delete) .program-panel__part {
+  padding-right: 22px;
+}
+
+@media (hover: hover) {
+  .program-panel__part:hover:not(:disabled, .is-active) {
+    border-color: var(--text-muted);
+  }
+}
+
+.program-panel__part.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+}
+
+.program-panel__part.is-playing {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-glow);
+}
+
+.program-panel__part-bars {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+.program-panel__part--add {
+  align-items: center;
+  padding-top: 0;
+  background: transparent;
+  border-style: dashed;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+}
+
+.program-panel__part--add:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.program-panel__part-delete {
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  transform: translateY(-50%);
+}
+
+@media (hover: hover) {
+  .program-panel__part-delete:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+}
+
+/* No section selected: the editor stays in place, greyed out (and inert), so selecting one moves nothing. */
+.program-panel__section.is-disabled {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
+/* ---- Drag to reorder (useReorder) ---- */
+
+/* A long press drags instead of opening the text-selection or link menu. */
+.program-panel__matrix-item,
+.program-panel__part-item {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.program-panel__matrix-item.is-dragging,
+.program-panel__part-item.is-dragging {
+  z-index: 10;
+  transition: none;
+}
+
+/* Opaque while it floats over the other items (the selected tint is translucent). */
+.is-dragging > .program-panel__cell,
+.is-dragging > .program-panel__part {
+  background: var(--surface-1);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-md);
+}
+
+.program-panel__matrix.is-sorting,
+.program-panel__matrix.is-sorting button,
+.program-panel__parts.is-sorting,
+.program-panel__parts.is-sorting button {
+  cursor: grabbing;
+}
+
+/* Where the dragged item lands: a bar in the gap before (or after) an item. */
+.is-drop-before::before,
+.is-drop-after::after {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  content: '';
+  pointer-events: none;
+}
+
+.is-drop-before::before {
+  left: calc(-1 * var(--space-1) / 2 - 2px);
+}
+
+.is-drop-after::after {
+  right: calc(-1 * var(--space-1) / 2 - 2px);
+}
+
+@media (forced-colors: active) {
+  .is-drop-before::before,
+  .is-drop-after::after {
+    background: Highlight;
+  }
+
+  .program-panel__part.is-active {
+    border-color: Highlight;
+  }
 }

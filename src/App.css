@@ -171,11 +171,6 @@
     border-bottom: 1px solid var(--border);
   }
 
-  /* No reserved row for the tempo badges: the stage has slack to absorb them. */
-  .app__stage .tempo-control__notes:empty {
-    display: none;
-  }
-
   .app__stage .status-bar__item {
     padding: var(--space-1) var(--space-3);
   }

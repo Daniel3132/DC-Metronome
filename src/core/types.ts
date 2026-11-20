@@ -66,20 +66,69 @@ export type SoundRole = 'accent' | 'medium' | 'beat' | 'sub'
 
 export type VoicePackId = 'en-male' | 'en-female' | 'es-female'
 
-/** One part of a program: a meter played for a number of bars. Outside program mode the active section loops forever. */
-export interface Section {
-  id: string
-  name: string
+/** What one bar sounds like: meter, accents and subdivision. The quick controls and beat pads edit one of these. */
+export interface Rhythm {
   /** Time signature numerator, 1..MAX_BEATS_PER_BAR. */
   beatsPerBar: number
   beatUnit: BeatUnit
   /** One level per beat; always exactly `beatsPerBar` long. */
   beats: BeatLevel[]
   subdivision: SubdivisionId
-  /** Bars this section lasts in program mode, 1..MAX_SECTION_BARS. Ignored outside program mode. */
+}
+
+/** A rhythm played `bars` bars in a row inside a section (e.g. one bar of 2/4). */
+export interface Part extends Rhythm {
+  id: string
+  /** 1..MAX_SECTION_BARS. */
   bars: number
+}
+
+/**
+ * One block of a program: its parts in order (a bar of 2/4, then a bar of 4/4 …), the whole sequence played `repeats`
+ * times. A plain section has a single part.
+ */
+export interface Section {
+  id: string
+  name: string
+  /** 1..MAX_SECTION_PARTS parts, played in order. */
+  parts: Part[]
+  /** Times the parts are played through in program mode, 1..MAX_SECTION_REPEATS. */
+  repeats: number
   /** Tempo for this section in program mode; null means "use the global tempo". */
   tempo: number | null
+}
+
+/** Points at one part of one section (by ids, so reordering never changes what it points at). */
+export interface PartRef {
+  section: string
+  part: string
+}
+
+/** Where a playback step comes from in the program, so pulses can report the section and part they belong to. */
+export interface PlayOrigin {
+  /** Index of the program section. */
+  section: number
+  /** Index of the part within that section. */
+  part: number
+  /** Bars of the section played before this step starts (earlier parts and repetitions). */
+  barOffset: number
+  /** Bars the whole section lasts (all parts × repeats). */
+  sectionBars: number
+}
+
+/**
+ * One single-meter stretch the sequencer plays: a section part, or the free rhythm. Built by playbackSettings from
+ * the program; the sequencer never sees sections with several parts.
+ */
+export interface PlaySection extends Rhythm {
+  id: string
+  name: string
+  /** Bars this step lasts when the sequence advances (program mode), at least 1. */
+  bars: number
+  /** Tempo in program mode; null means "use the global tempo". */
+  tempo: number | null
+  /** Missing for steps that are not part of the program (tests, the free rhythm). */
+  origin?: PlayOrigin
 }
 
 export interface ProgramSettings {
@@ -108,6 +157,7 @@ export type PracticeAtTarget = 'hold' | 'restart' | 'reverse' | 'stop'
 
 /**
  * Speed trainer. Starts at `startBpm` and moves by `stepBpm` toward `targetBpm` every `everyBars` bars.
+ * The target is the main tempo (withBpm), and the start moves with it, keeping `targetRatio` to the target.
  * Increases when target > start, decreases when target < start. While enabled it overrides every other
  * tempo source (global tempo and section tempos); the tempo percentage still applies on top.
  */
@@ -115,6 +165,11 @@ export interface PracticeSettings {
   enabled: boolean
   startBpm: number
   targetBpm: number
+  /**
+   * targetBpm / startBpm as the user set it. Kept separately so the target can follow the main tempo without the
+   * rounding of each step drifting it (clamping to MAX_BPM does not change it either).
+   */
+  targetRatio: number
   /** Positive step size in BPM. */
   stepBpm: number
   everyBars: number
@@ -136,6 +191,11 @@ export interface VoiceSettings {
   subdivisions: boolean
   /** Keep the clicks playing under the voice. When off, the voice replaces the click on pulses it speaks. */
   clicks: boolean
+  /**
+   * In program mode, say the name of the next section at the start of the last bar before it (and the first section's
+   * name when playback starts). Uses the browser's speech synthesis; works whether or not counting is on.
+   */
+  announceSections: boolean
 }
 
 /** All volumes are linear gains in 0..1. */
@@ -160,16 +220,15 @@ export interface Settings {
   bpm: number
   /** Scales whatever tempo is in effect, MIN_TEMPO_PERCENT..MAX_TEMPO_PERCENT (integer). */
   tempoPercent: number
-  /** Always at least one section. */
+  /** The program, in play order; may be empty (then the free rhythm plays even in program mode). */
   sections: Section[]
-  /** Index of the section selected in the program (the one "Save section" writes to). */
-  activeSection: number
   /**
-   * The rhythm the quick controls and beat pads edit (meter, accents, subdivision), id CURRENT_SECTION_ID.
-   * Outside program mode this is what plays. It is only written into a section by "Save section", so editing it
-   * never changes the program by accident.
+   * The section part the quick controls and beat pads edit, or null for none (they edit `current`). Outside program
+   * mode the selected section loops; with nothing selected `current` plays.
    */
-  current: Section
+  selected: PartRef | null
+  /** The free rhythm, id CURRENT_PART_ID: edited and played while no section is selected. */
+  current: Part
   program: ProgramSettings
   gap: GapSettings
   randomMute: RandomMuteSettings
@@ -178,6 +237,15 @@ export interface Settings {
   voice: VoiceSettings
   mixer: MixerSettings
   visual: VisualSettings
+}
+
+/**
+ * What the engine and sequencer get: the settings with the program expanded into single-meter steps (see
+ * playbackSettings). `activeSection` is the step that loops outside program mode.
+ */
+export interface PlaybackSettings extends Omit<Settings, 'sections' | 'selected' | 'current'> {
+  sections: PlaySection[]
+  activeSection: number
 }
 
 export type SilentReason = 'gap' | 'random' | 'level'
@@ -199,11 +267,16 @@ export interface PulseEvent {
   duration: number
   /** Seconds in one beat at `bpm`. */
   beatDuration: number
+  /** Program section this pulse belongs to (the step index for steps without an origin). */
   sectionIndex: number
-  /** 0-based bar within the current section. */
+  /** Part of that section (0 for steps without an origin). */
+  partIndex: number
+  /** 0-based bar within the current section (counting all its parts and repetitions). */
   sectionBar: number
-  /** Bars the current section lasts in program mode; null outside program mode. */
+  /** Bars the current section lasts while the sequence advances (program mode); null otherwise. */
   sectionBars: number | null
+  /** Subdivision of the step this pulse belongs to. */
+  subdivision: SubdivisionId
   /** 0-based bars since playback started. */
   totalBar: number
   /** 0-based beat within the bar. */

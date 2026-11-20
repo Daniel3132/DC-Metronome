@@ -118,6 +118,14 @@ export function VoicePanel({ settings, onChange, metronome }: PanelProps) {
         <Field inline label="Keep clicks" hint="Off: the voice replaces the click.">
           <Toggle hideLabel label="Keep clicks" checked={voice.clicks} onChange={(clicks) => setVoice({ clicks })} />
         </Field>
+        <Field inline label="Announce sections" hint="Program mode: says the next section’s name on its last bar before it.">
+          <Toggle
+            hideLabel
+            label="Announce sections"
+            checked={voice.announceSections}
+            onChange={(announceSections) => setVoice({ announceSections })}
+          />
+        </Field>
       </div>
 
       <Slider
@@ -149,6 +157,7 @@ export function VoicePanel({ settings, onChange, metronome }: PanelProps) {
         <li>At fast tempos the words are sped up to fit.</li>
         <li>Counts up to 16 beats per bar.</li>
         <li>Muted and silent beats are not spoken.</li>
+        <li>Section names are spoken by your browser’s own voice, even with counting off.</li>
       </ul>
     </Panel>
   )

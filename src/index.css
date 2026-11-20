@@ -1,7 +1,7 @@
 /*
  * DC Metronome design tokens and base styles.
  * Dark by default (stage and practice rooms), light under prefers-color-scheme: light.
- * One vivid accent (signal cyan); everything else is calm, layered neutrals.
+ * One vivid accent (signal cyan by default, picked in the theme menu); everything else is calm, layered neutrals.
  */
 
 :root {
@@ -21,16 +21,17 @@
   --text-secondary: #b4bdcb;
   --text-muted: #838c9c;
 
+  /* The accent comes from the theme picker ([data-accent] below); every other accent token is derived from it. */
   --accent: #36d6e7;
-  --accent-hover: #6ae3f0;
-  --accent-active: #22b9c9;
+  --accent-hover: color-mix(in srgb, var(--accent), white 25%);
+  --accent-active: color-mix(in srgb, var(--accent), black 15%);
   /* Text/icons placed on a solid accent fill. */
   --accent-contrast: #03191d;
   /* Tinted accent background for selected or highlighted areas. */
-  --accent-soft: rgb(54 214 231 / 0.14);
-  --accent-border: rgb(54 214 231 / 0.5);
+  --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+  --accent-border: color-mix(in srgb, var(--accent) 50%, transparent);
   /* Accent-colored text on regular surfaces. */
-  --accent-text: #5fe0ee;
+  --accent-text: color-mix(in srgb, var(--accent), white 15%);
 
   --success: #4ade80;
   --success-soft: rgb(74 222 128 / 0.14);
@@ -43,7 +44,7 @@
   /* Beat levels (beat editor pads, beat indicator). */
   --level-accent: var(--accent);
   --level-normal: #c7d0dd;
-  --level-medium: #2a9fac;
+  --level-medium: color-mix(in srgb, var(--accent), black 22%);
   --level-soft: #5f6a7b;
   --level-mute: #2b313c;
 
@@ -96,10 +97,10 @@
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.45);
   --shadow-md: 0 4px 14px rgb(0 0 0 / 0.38), 0 1px 3px rgb(0 0 0 / 0.3);
   --shadow-lg: 0 18px 44px rgb(0 0 0 / 0.5), 0 4px 12px rgb(0 0 0 / 0.3);
-  --shadow-glow: 0 0 0 1px var(--accent-border), 0 0 28px rgb(54 214 231 / 0.4);
+  --shadow-glow: 0 0 0 1px var(--accent-border), 0 0 28px color-mix(in srgb, var(--accent) 40%, transparent);
 
   /* Focus */
-  --focus-color: #7eeaf5;
+  --focus-color: color-mix(in srgb, var(--accent), white 40%);
   --focus-ring: 3px solid var(--focus-color);
   --focus-offset: 2px;
 
@@ -129,12 +130,12 @@
     --text-muted: #5d6979;
 
     --accent: #0b7a8c;
-    --accent-hover: #096b7b;
-    --accent-active: #075a68;
+    --accent-hover: color-mix(in srgb, var(--accent), black 12%);
+    --accent-active: color-mix(in srgb, var(--accent), black 25%);
     --accent-contrast: #ffffff;
-    --accent-soft: rgb(11 122 140 / 0.11);
-    --accent-border: rgb(11 122 140 / 0.45);
-    --accent-text: #076675;
+    --accent-soft: color-mix(in srgb, var(--accent) 11%, transparent);
+    --accent-border: color-mix(in srgb, var(--accent) 45%, transparent);
+    --accent-text: color-mix(in srgb, var(--accent), black 15%);
 
     --success: #15803d;
     --success-soft: rgb(21 128 61 / 0.11);
@@ -146,16 +147,61 @@
 
     --level-accent: var(--accent);
     --level-normal: #3b4554;
-    --level-medium: #5aa9b4;
+    --level-medium: color-mix(in srgb, var(--accent), white 35%);
     --level-soft: #9ba6b5;
     --level-mute: #dfe4ea;
 
     --shadow-sm: 0 1px 2px rgb(16 24 40 / 0.08);
     --shadow-md: 0 4px 14px rgb(16 24 40 / 0.1), 0 1px 3px rgb(16 24 40 / 0.08);
     --shadow-lg: 0 18px 44px rgb(16 24 40 / 0.16), 0 4px 12px rgb(16 24 40 / 0.08);
-    --shadow-glow: 0 0 0 1px var(--accent-border), 0 0 24px rgb(11 122 140 / 0.3);
+    --shadow-glow: 0 0 0 1px var(--accent-border), 0 0 24px color-mix(in srgb, var(--accent) 30%, transparent);
 
-    --focus-color: #0a6f80;
+    --focus-color: color-mix(in srgb, var(--accent), black 10%);
+  }
+}
+
+/* Accent colors from the theme picker (src/state/theme.ts). Cyan, the default, is :root itself. */
+:root[data-accent='blue'] {
+  --accent: #60a5fa;
+  --accent-contrast: #031327;
+}
+:root[data-accent='violet'] {
+  --accent: #a78bfa;
+  --accent-contrast: #160a33;
+}
+:root[data-accent='pink'] {
+  --accent: #f472b6;
+  --accent-contrast: #2a0516;
+}
+:root[data-accent='green'] {
+  --accent: #34d399;
+  --accent-contrast: #022117;
+}
+:root[data-accent='orange'] {
+  --accent: #fb923c;
+  --accent-contrast: #2a1003;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='blue'] {
+    --accent: #1d4ed8;
+    --accent-contrast: #ffffff;
+  }
+  :root[data-accent='violet'] {
+    --accent: #6d28d9;
+    --accent-contrast: #ffffff;
+  }
+  :root[data-accent='pink'] {
+    --accent: #be185d;
+    --accent-contrast: #ffffff;
+  }
+  :root[data-accent='green'] {
+    --accent: #047857;
+    --accent-contrast: #ffffff;
+  }
+  :root[data-accent='orange'] {
+    --accent: #c2410c;
+    --accent-contrast: #ffffff;
   }
 }
 

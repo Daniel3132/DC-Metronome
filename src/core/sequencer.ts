@@ -15,8 +15,8 @@ import type {
   PracticeSettings,
   PracticeState,
   PulseEvent,
-  Section,
-  Settings,
+  PlaySection,
+  PlaybackSettings,
   SilentReason,
   SoundRole,
   VoiceWord,
@@ -45,11 +45,14 @@ export interface SequencerOptions {
  *   The tempo counts quarter notes: one beat (one `beatUnit` note) lasts beatSeconds(bpm, beatUnit) = 60 / bpm × 4 / beatUnit,
  *   so 3/8 plays twice as fast as 3/4 at the same BPM.
  *
- * Bars and sections:
+ * Bars and sections ("sections" here are single-meter steps; playbackSettings expands program sections into them):
  * - Outside program mode the section is `settings.activeSection`, re-read at every bar start; it loops forever.
  * - In program mode playback starts at section 0; after a section has played `bars` bars it moves to the next;
  *   after the last section it loops to 0 if program.loop, otherwise the sequence ends (next() returns null).
- *   sectionBars is the section's `bars` in program mode, null otherwise.
+ * - A step with an `origin` reports the program section and part it comes from: sectionIndex and partIndex are the
+ *   origin's, sectionBar counts from the start of the whole section (origin.barOffset + bars into the step) and
+ *   sectionBars is origin.sectionBars. Without an origin: sectionIndex is the step index, partIndex 0, sectionBar the
+ *   bar within the step. sectionBars is null outside program mode.
  *
  * Gap trainer (settings.gap): with a counter of bars played since the gap trainer was (re)enabled (starting at 0),
  *   a bar is silent when counter % (playBars + muteBars) >= playBars. The counter resets when gap.enabled
@@ -82,16 +85,16 @@ export interface SequencerOptions {
  */
 export interface Sequencer {
   /** AudioContext time of the pulse next() would return, or null when the sequence has ended. Does not advance. */
-  peekTime(settings: Settings): number | null
+  peekTime(settings: PlaybackSettings): number | null
   /** Produce the next pulse and advance; null once the sequence has ended (and on every later call). */
-  next(settings: Settings): PulseEvent | null
+  next(settings: PlaybackSettings): PulseEvent | null
 }
 
 /** Offsets closer than this are the same position in the beat. */
 const OFFSET_EPSILON = 1e-9
 
 /** Only used when the settings have no sections at all (the sanitizer never produces that). */
-const FALLBACK_SECTION: Section = {
+const FALLBACK_SECTION: PlaySection = {
   id: '',
   name: 'Section',
   beatsPerBar: 4,
@@ -143,7 +146,7 @@ interface State {
   randomMuted: boolean
 }
 
-function sectionsOf(settings: Settings): readonly Section[] {
+function sectionsOf(settings: PlaybackSettings): readonly PlaySection[] {
   return Array.isArray(settings.sections) && settings.sections.length > 0 ? settings.sections : [FALLBACK_SECTION]
 }
 
@@ -151,34 +154,34 @@ function clampIndex(index: number, length: number): number {
   return Number.isNaN(index) ? 0 : Math.min(length - 1, Math.max(0, Math.round(index)))
 }
 
-function beatsPerBarOf(section: Section): number {
+function beatsPerBarOf(section: PlaySection): number {
   const beats = Math.round(section.beatsPerBar)
   return beats >= 1 ? Math.min(beats, MAX_BEATS_PER_BAR) : 1
 }
 
-function barsOf(section: Section): number {
+function barsOf(section: PlaySection): number {
   const bars = Math.round(section.bars)
   return bars >= 1 ? bars : 1
 }
 
-function levelOf(section: Section, beat: number): BeatLevel {
+function levelOf(section: PlaySection, beat: number): BeatLevel {
   const level = section.beats[beat]
   return level !== undefined && Object.hasOwn(LEVEL_GAIN, level) ? level : 'normal'
 }
 
-function resolveSectionIndex(state: State, sections: readonly Section[]): number {
+function resolveSectionIndex(state: State, sections: readonly PlaySection[]): number {
   if (sections[state.sectionIndex]?.id === state.sectionId) return state.sectionIndex
   const byId = sections.findIndex((section) => section.id === state.sectionId)
   return byId >= 0 ? byId : clampIndex(state.sectionIndex, sections.length)
 }
 
 /** The speed trainer sets the tempo of the bar the state is in (so the percentage does not apply). */
-function practiceActive(state: State, settings: Settings): boolean {
+function practiceActive(state: State, settings: PlaybackSettings): boolean {
   return settings.practice.enabled && state.practice !== null
 }
 
 /** Tempo before the percentage, for the bar the state is in. */
-function baseTempo(state: State, settings: Settings, section: Section): number {
+function baseTempo(state: State, settings: PlaybackSettings, section: PlaySection): number {
   let base = settings.bpm
   if (settings.practice.enabled && state.practice) base = state.practice.bpm
   else if (settings.program.enabled && section.tempo != null) base = section.tempo
@@ -268,7 +271,7 @@ function finishPracticeBar(run: PracticeRun, practice: PracticeSettings): Practi
 
 // --- Position ---
 
-function initialState(settings: Settings, startTime: number): State {
+function initialState(settings: PlaybackSettings, startTime: number): State {
   const sections = sectionsOf(settings)
   const sectionIndex = settings.program.enabled ? 0 : clampIndex(settings.activeSection, sections.length)
   const state: State = {
@@ -296,7 +299,7 @@ function initialState(settings: Settings, startTime: number): State {
 }
 
 /** Bar-boundary work, in order: gap counter, speed trainer, program advance, next section. `state` is at the boundary. */
-function startBar(state: State, settings: Settings): State {
+function startBar(state: State, settings: PlaybackSettings): State {
   const gap = gapForNewBar(state, settings.gap)
 
   let practice: PracticeRun | null = null
@@ -342,7 +345,7 @@ function startBar(state: State, settings: Settings): State {
 }
 
 /** The state after producing the next pulse with the current settings. Pure: peekTime and next share it. */
-function advance(state: State, settings: Settings): State {
+function advance(state: State, settings: PlaybackSettings): State {
   if (state.ended) return state
   const sections = sectionsOf(settings)
   const sectionIndex = resolveSectionIndex(state, sections)
@@ -391,7 +394,7 @@ function advance(state: State, settings: Settings): State {
   return s.beat + 1 < beatsPerBar ? { ...boundary, beat: s.beat + 1 } : startBar(boundary, settings)
 }
 
-function pulseEvent(state: State, settings: Settings): PulseEvent {
+function pulseEvent(state: State, settings: PlaybackSettings): PulseEvent {
   const section = sectionsOf(settings)[state.sectionIndex]
   const subdivision = getSubdivision(section.subdivision)
   const baseBpm = baseTempo(state, settings, section)
@@ -407,13 +410,16 @@ function pulseEvent(state: State, settings: Settings): PulseEvent {
   else if (state.randomMuted && settings.randomMute.enabled) silentReason = 'random'
   else if (level === 'mute') silentReason = 'level'
 
+  const origin = section.origin
   const event = {
     time: state.time,
     duration: (following - state.offset) * beatDuration,
     beatDuration,
-    sectionIndex: state.sectionIndex,
-    sectionBar: state.sectionBar,
-    sectionBars: settings.program.enabled ? barsOf(section) : null,
+    sectionIndex: origin?.section ?? state.sectionIndex,
+    partIndex: origin?.part ?? 0,
+    sectionBar: (origin?.barOffset ?? 0) + state.sectionBar,
+    sectionBars: settings.program.enabled ? (origin?.sectionBars ?? barsOf(section)) : null,
+    subdivision: subdivision.id,
     totalBar: state.totalBar,
     beat: state.beat,
     beatsPerBar: beatsPerBarOf(section),
@@ -455,7 +461,7 @@ function pulseEvent(state: State, settings: Settings): PulseEvent {
 }
 
 /** Create a sequencer whose first pulse (bar 0, beat 0, pulse 0) is at `startTime`. */
-export function createSequencer(settings: Settings, startTime: number, options: SequencerOptions = {}): Sequencer {
+export function createSequencer(settings: PlaybackSettings, startTime: number, options: SequencerOptions = {}): Sequencer {
   const random = options.random ?? Math.random
   let state = initialState(settings, startTime)
 

@@ -1,8 +1,8 @@
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from 'react'
 import { STORAGE_KEYS } from '../../core/constants'
 import { makeId } from '../../core/settings'
-import { FACTORY_PRESETS } from '../../state/factoryPresets'
-import { applyFactoryPreset, applyPreset, describeSettings, suggestedName } from '../../state/presetSummary'
+import { FACTORY_PRESETS, type FactoryPreset } from '../../state/factoryPresets'
+import { applyFactoryPreset, applyPreset, describeFactoryPreset, describeSettings, suggestedName } from '../../state/presetSummary'
 import { loadPresets, savePresets, type Preset } from '../../state/storage'
 import type { PanelProps } from '../panelTypes'
 import { SaveIcon } from '../icons/icons'
@@ -13,7 +13,8 @@ const NAME_MAX_LENGTH = 60
 
 /**
  * Presets at a glance in the Quick tab: one tap loads a saved preset (with its program), and the current setup can be
- * saved under a name. Renaming, deleting, import and export stay in the Presets tab.
+ * saved under a name. Tapping the highlighted preset again unselects it (the settings stay as they are). Renaming,
+ * deleting, import and export stay in the Presets tab.
  */
 interface QuickPresetsProps extends Pick<PanelProps, 'settings' | 'onChange'> {
   /** Replaces the "Presets" heading (the Quick tab puts its Program / Presets switch there). */
@@ -62,9 +63,35 @@ export function QuickPresets({
   }
 
   function load(preset: Preset) {
+    if (unselect(preset)) return
     onChange((prev) => applyPreset(prev, preset.settings))
     setLoadedId(preset.id)
     setStatus(`Loaded "${preset.name}".`)
+  }
+
+  function loadFactory(preset: FactoryPreset) {
+    if (unselect(preset)) return
+    onChange((prev) => applyFactoryPreset(prev, preset))
+    setLoadedId(preset.id)
+    setStatus(`Loaded "${preset.name}".`)
+  }
+
+  /** A tap on the highlighted preset unselects it instead of loading it again. */
+  function unselect(preset: { id: string; name: string }): boolean {
+    if (preset.id !== loadedId) return false
+    setLoadedId(null)
+    setStatus(`Unselected "${preset.name}".`)
+    return true
+  }
+
+  function cardProps(preset: { id: string; name: string }, description?: string) {
+    const loaded = preset.id === loadedId
+    return {
+      type: 'button' as const,
+      className: `quick-presets__card${loaded ? ' is-loaded' : ''}`,
+      'aria-pressed': loaded,
+      title: loaded ? `Unselect ${preset.name}` : description ? `Load ${preset.name}: ${description}` : `Load ${preset.name}`,
+    }
   }
 
   const saveForm = (
@@ -117,12 +144,7 @@ export function QuickPresets({
             <ul className="quick-presets__grid" aria-label="Saved presets">
               {presets.map((preset) => (
                 <li key={preset.id}>
-                  <button
-                    type="button"
-                    className={`quick-presets__card${preset.id === loadedId ? ' is-loaded' : ''}`}
-                    title={`Load ${preset.name}`}
-                    onClick={() => load(preset)}
-                  >
+                  <button {...cardProps(preset)} onClick={() => load(preset)}>
                     <span className="quick-presets__name">{preset.name}</span>
                     <span className="quick-presets__meta tabular">{describeSettings(preset.settings)}</span>
                   </button>
@@ -132,20 +154,12 @@ export function QuickPresets({
           )}
 
           <h3 className="quick-presets__heading">Factory</h3>
-          <ul className="quick-presets__grid quick-presets__grid--factory" aria-label="Factory presets">
+          <ul className="quick-presets__grid" aria-label="Factory presets">
             {FACTORY_PRESETS.map((preset) => (
               <li key={preset.id}>
-                <button
-                  type="button"
-                  className={`quick-presets__card${preset.id === loadedId ? ' is-loaded' : ''}`}
-                  title={preset.description}
-                  onClick={() => {
-                    onChange((prev) => applyFactoryPreset(prev, preset))
-                    setLoadedId(preset.id)
-                    setStatus(`Loaded "${preset.name}".`)
-                  }}
-                >
+                <button {...cardProps(preset, preset.description)} onClick={() => loadFactory(preset)}>
                   <span className="quick-presets__name">{preset.name}</span>
+                  <span className="quick-presets__meta tabular">{describeFactoryPreset(preset)}</span>
                 </button>
               </li>
             ))}
