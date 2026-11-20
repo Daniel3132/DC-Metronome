@@ -5,6 +5,7 @@ import { MainPanel } from './components/MainPanel/MainPanel'
 import { MixerPanel } from './components/MixerPanel/MixerPanel'
 import { PresetsPanel } from './components/PresetsPanel/PresetsPanel'
 import { ShortcutsHelp } from './components/ShortcutsHelp/ShortcutsHelp'
+import { ThemePicker } from './components/ThemePicker/ThemePicker'
 import { SoundPanel } from './components/SoundPanel/SoundPanel'
 import { StatusBar } from './components/StatusBar/StatusBar'
 import { TapTempoButton, type TapTempoHandle } from './components/TapTempoButton/TapTempoButton'
@@ -14,8 +15,8 @@ import { VoicePanel } from './components/VoicePanel/VoicePanel'
 import { FlashIcon, MetronomeIcon } from './components/icons/icons'
 import { Toggle } from './components/ui/ui'
 import type { PanelProps } from './components/panelTypes'
-import { clampBpm, clampTempoPercent, selectSection } from './core/settings'
-import type { Settings } from './core/types'
+import { clampTempoPercent, findPart, practiceAt, selectPart, selectSection, withBpm } from './core/settings'
+import type { PartRef, Rhythm, Settings } from './core/types'
 import { useKeyboardShortcuts } from './state/useKeyboardShortcuts'
 import { useMetronome } from './state/useMetronome'
 import { useSettings } from './state/useSettings'
@@ -33,6 +34,27 @@ const TABS: readonly { id: TabId; label: string }[] = [
 ]
 const MAIN_TAB: TabId = 'quick'
 
+/** Anything a click can operate. A click on none of these (empty space, a card's background) clears the selection. */
+const CONTROLS = [
+  'button',
+  'a[href]',
+  'input',
+  'select',
+  'textarea',
+  'label',
+  '[role="radio"]',
+  '[role="radiogroup"]',
+  '[role="slider"]',
+  '[role="switch"]',
+  '[role="tab"]',
+  '[role="option"]',
+  '[role="listbox"]',
+  '[role="dialog"]',
+  '.ui-stepper-control',
+  '.ui-slider-control',
+  '.ui-select-wrap',
+].join(', ')
+
 /** Tabs whose feature is switched on get a dot, so an active trainer is never forgotten. */
 function tabIndicator(tab: TabId, settings: Settings): string | null {
   switch (tab) {
@@ -43,7 +65,7 @@ function tabIndicator(tab: TabId, settings: Settings): string | null {
         ? 'on'
         : null
     case 'voice':
-      return settings.voice.enabled ? 'on' : null
+      return settings.voice.enabled || settings.voice.announceSections ? 'on' : null
     case 'mixer':
       return settings.mixer.muted ? 'muted' : null
     default:
@@ -91,23 +113,35 @@ export default function App() {
 
   const pulse = playback.status === 'playing' ? playback.pulse : null
   const { sections } = settings
-  // While a program plays, the stage follows the playing section; otherwise it shows the working rhythm (what the
-  // quick controls edit and what plays outside program mode).
-  const programPlaying = pulse !== null && settings.program.enabled
-  const shownSection = programPlaying
-    ? (sections[Math.min(pulse.sectionIndex, sections.length - 1)] ?? sections[0])
-    : settings.current
-  const gridPulse = pulse
+  const selected = findPart(settings, settings.selected)
+  // While sections play (program mode, or the selected section looping) the stage follows the playing part; otherwise
+  // it shows what the quick controls edit: the selected part, or the free rhythm.
+  const sectionsPlaying = pulse !== null && (settings.program.enabled || selected !== null)
+  const playingSection = sectionsPlaying ? sections[pulse.sectionIndex] : undefined
+  const playingPart = playingSection?.parts[pulse?.partIndex ?? 0]
+  const shownFrom = playingSection && playingPart
+    ? { section: playingSection, sectionIndex: pulse?.sectionIndex ?? 0, part: playingPart, partIndex: pulse?.partIndex ?? 0 }
+    : selected
+  const shownRhythm: Rhythm = shownFrom?.part ?? settings.current
+  const shownTarget: PartRef | null = shownFrom ? { section: shownFrom.section.id, part: shownFrom.part.id } : null
+  const shownName = shownFrom
+    ? [
+        shownFrom.section.name.trim() || `Section ${shownFrom.sectionIndex + 1}`,
+        shownFrom.section.parts.length > 1 ? `part ${shownFrom.partIndex + 1}/${shownFrom.section.parts.length}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : null
   const playingBpm = pulse !== null ? Math.round(pulse.bpm * 10) / 10 : null
   const playingBaseBpm = pulse !== null ? pulse.baseBpm : null
-  const playingSectionName = programPlaying ? (sections[pulse.sectionIndex]?.name ?? null) : null
+  const playingSectionName = settings.program.enabled && playingSection ? playingSection.name : null
 
-  const setBpm = (bpm: number) => update((prev) => ({ ...prev, bpm: clampBpm(bpm) }))
+  const setBpm = (bpm: number) => update((prev) => withBpm(prev, bpm))
 
   useKeyboardShortcuts({
     togglePlay: () => void metronome.toggle(),
     tap: () => tapTempo.current?.tap(),
-    nudgeBpm: (delta) => update((prev) => ({ ...prev, bpm: clampBpm(prev.bpm + delta) })),
+    nudgeBpm: (delta) => update((prev) => withBpm(prev, prev.bpm + delta)),
     nudgeTempoPercent: (delta) =>
       update((prev) => ({ ...prev, tempoPercent: clampTempoPercent(prev.tempoPercent + delta) })),
     toggleMute: () => update((prev) => ({ ...prev, mixer: { ...prev.mixer, muted: !prev.mixer.muted } })),
@@ -115,19 +149,44 @@ export default function App() {
     toggleVoice: () => update((prev) => ({ ...prev, voice: { ...prev.voice, enabled: !prev.voice.enabled } })),
     toggleProgram: () => update((prev) => ({ ...prev, program: { ...prev.program, enabled: !prev.program.enabled } })),
     toggleSpeedTrainer: () =>
-      update((prev) => ({ ...prev, practice: { ...prev.practice, enabled: !prev.practice.enabled } })),
+      update((prev) => ({
+        ...prev,
+        practice: { ...practiceAt(prev.practice, prev.bpm), enabled: !prev.practice.enabled },
+      })),
     toggleFlash: () => update((prev) => ({ ...prev, visual: { ...prev.visual, flash: !prev.visual.flash } })),
     openTab: (index) => {
       const next = TABS[index]
       if (next) setTab(next.id)
     },
     closeTab: () => setTab(MAIN_TAB),
+    // From no selection, "next" selects the first section and "previous" the last.
     stepSection: (delta) =>
       update((prev) => {
-        const activeSection = Math.min(Math.max(0, prev.activeSection + delta), prev.sections.length - 1)
-        return activeSection === prev.activeSection ? prev : selectSection(prev, activeSection)
+        const current = findPart(prev, prev.selected)?.sectionIndex
+        const index =
+          current === undefined
+            ? delta > 0
+              ? 0
+              : prev.sections.length - 1
+            : Math.min(Math.max(0, current + delta), prev.sections.length - 1)
+        return selectSection(prev, index)
       }),
   })
+
+  // Clicking outside every control clears the section selection (the controls go back to the free rhythm). Only
+  // listened for while something is selected, since every update makes new settings.
+  const hasSelection = settings.selected !== null
+  useEffect(() => {
+    if (!hasSelection) return
+    const onClick = (e: MouseEvent) => {
+      if (e.button !== 0 || !(e.target instanceof Element) || e.target.closest(CONTROLS)) return
+      // The end of a text selection is not a click on empty space.
+      if (!window.getSelection()?.isCollapsed) return
+      update((prev) => selectPart(prev, null))
+    }
+    document.addEventListener('click', onClick)
+    return () => document.removeEventListener('click', onClick)
+  }, [hasSelection, update])
 
   // Keep the selected tab visible in the horizontally scrolling tab bar (phones), also after a reload.
   useEffect(() => {
@@ -177,11 +236,13 @@ export default function App() {
             <FlashIcon size={14} />
             <Toggle
               size="sm"
+              hideLabel
               label="Flash"
               checked={settings.visual.flash}
               onChange={(flash) => update((prev) => ({ ...prev, visual: { ...prev.visual, flash } }))}
             />
           </span>
+          <ThemePicker />
           <ShortcutsHelp />
         </div>
       </header>
@@ -201,7 +262,7 @@ export default function App() {
             onToggle={metronome.toggle}
             aside={<TapTempoButton ref={tapTempo} onTempo={setBpm} />}
           />
-          <BeatGrid section={shownSection} showName={programPlaying} onChange={update} pulse={gridPulse} />
+          <BeatGrid rhythm={shownRhythm} target={shownTarget} name={shownName} onChange={update} pulse={pulse} />
           <StatusBar
             pulse={pulse}
             startTime={playback.startTime}

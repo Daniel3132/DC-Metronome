@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { MAX_BPM, MAX_TEMPO_PERCENT, MIN_BPM, MIN_TEMPO_PERCENT } from '../../core/constants'
 import { tempoMarking } from '../../core/meter'
-import { clampBpm, clampTempoPercent, playedBpm } from '../../core/settings'
+import { clampTempoPercent, playedBpm, withBpm } from '../../core/settings'
 import type { Settings } from '../../core/types'
 import type { SettingsUpdater } from '../../state/useSettings'
 import { MinusIcon, PlusIcon, TrendDownIcon, TrendUpIcon } from '../icons/icons'
@@ -119,8 +119,8 @@ export function TempoControl({ settings, onChange, playingBpm, playingBaseBpm }:
   // Escape blurs the field too; this tells the blur handler to discard the draft instead of committing it.
   const cancelEdit = useRef(false)
 
-  const setBpm = (next: number) => onChange((prev) => ({ ...prev, bpm: clampBpm(next) }))
-  const nudge = (delta: number) => () => onChange((prev) => ({ ...prev, bpm: clampBpm(prev.bpm + delta) }))
+  const setBpm = (next: number) => onChange((prev) => withBpm(prev, next))
+  const nudge = (delta: number) => () => onChange((prev) => withBpm(prev, prev.bpm + delta))
   const setPercent = (next: number) => onChange((prev) => ({ ...prev, tempoPercent: clampTempoPercent(next) }))
 
   // While stopped, show what Start would play: the speed trainer and a program's first section tempo win over bpm.
@@ -128,15 +128,19 @@ export function TempoControl({ settings, onChange, playingBpm, playingBaseBpm }:
   const startBase = practice.enabled ? practice.startBpm : firstSectionTempo ?? bpm
   // The speed trainer plays its tempo as set; the percentage only scales the other tempos.
   const actual = playingBpm ?? playedBpm(startBase, tempoPercent, practice.enabled)
-  const differs = Math.abs(actual - bpm) >= 0.05
+  // While the speed trainer plays, the big readout shows its current tempo; buttons and slider still set the main
+  // tempo (which is the trainer's target).
+  const trainerPlaying = practice.enabled && playingBpm !== null
+  const shown = trainerPlaying ? Math.round(actual) : bpm
+  // With the trainer on, its badge takes the notes row instead of "Plays at" (the readout already shows its tempo).
+  const differs = !practice.enabled && Math.abs(actual - shown) >= 0.05
 
   const base = playingBaseBpm ?? startBase
   let reason: string | null = null
   if (differs) {
     const parts: string[] = []
-    if (practice.enabled) parts.push('speed trainer')
-    else if (base !== bpm) parts.push('section tempo')
-    if (tempoPercent !== 100 && !practice.enabled) parts.push(`${tempoPercent}%`)
+    if (base !== bpm) parts.push('section tempo')
+    if (tempoPercent !== 100) parts.push(`${tempoPercent}%`)
     reason = parts.length > 0 ? parts.join(' · ') : null
   }
 
@@ -185,8 +189,6 @@ export function TempoControl({ settings, onChange, playingBpm, playingBaseBpm }:
     setBpm(bpm + delta)
   }
 
-  const practiceUp = practice.targetBpm >= practice.startBpm
-
   return (
     <section className="tempo-control" aria-label="Tempo">
       <div className="tempo-control__main">
@@ -200,7 +202,7 @@ export function TempoControl({ settings, onChange, playingBpm, playingBaseBpm }:
         </HoldButton>
 
         <div className="tempo-control__readout">
-          <span className="tempo-control__marking">{tempoMarking(bpm)}</span>
+          <span className="tempo-control__marking">{trainerPlaying ? 'Speed trainer' : tempoMarking(bpm)}</span>
           <input
             type="text"
             role="spinbutton"
@@ -211,12 +213,12 @@ export function TempoControl({ settings, onChange, playingBpm, playingBaseBpm }:
             spellCheck={false}
             maxLength={5}
             aria-label="Tempo in BPM"
-            aria-valuenow={bpm}
+            aria-valuenow={shown}
             aria-valuemin={MIN_BPM}
             aria-valuemax={MAX_BPM}
-            aria-valuetext={`${bpm} BPM, ${tempoMarking(bpm)}`}
-            title="Click to type a tempo"
-            value={draft ?? String(bpm)}
+            aria-valuetext={trainerPlaying ? `${shown} BPM, speed trainer` : `${bpm} BPM, ${tempoMarking(bpm)}`}
+            title={trainerPlaying ? 'Speed trainer tempo. Type to set the target tempo' : 'Click to type a tempo'}
+            value={draft ?? String(shown)}
             onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setDraft(e.currentTarget.value)}
             onBlur={onValueBlur}
@@ -260,8 +262,8 @@ export function TempoControl({ settings, onChange, playingBpm, playingBaseBpm }:
 
       <div className="tempo-control__notes">
         {practice.enabled && (
-          <Badge tone="warning" title="The speed trainer sets the tempo while it is on (Practice tab)">
-            {practiceUp ? <TrendUpIcon size={14} /> : <TrendDownIcon size={14} />}
+          <Badge tone="warning" title="The speed trainer sets the tempo while it is on. Its target is the main tempo.">
+            {practice.targetBpm >= practice.startBpm ? <TrendUpIcon size={14} /> : <TrendDownIcon size={14} />}
             Speed trainer {practice.startBpm} → {practice.targetBpm}
           </Badge>
         )}

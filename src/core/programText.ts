@@ -1,28 +1,45 @@
-import { BEAT_UNITS, MAX_BEATS_PER_BAR, MAX_BPM, MAX_SECTION_BARS, MAX_SECTIONS, MIN_BPM } from './constants'
+import {
+  BEAT_UNITS,
+  MAX_BEATS_PER_BAR,
+  MAX_BPM,
+  MAX_SECTION_BARS,
+  MAX_SECTION_PARTS,
+  MAX_SECTION_REPEATS,
+  MAX_SECTIONS,
+  MIN_BPM,
+} from './constants'
 import { beatsFromGrouping, defaultGrouping, groupingKey, matchingAccentGrouping } from './meter'
 import { createSection, defaultBeats } from './settings'
-import type { BeatUnit, Section } from './types'
+import type { BeatUnit, Part, Section } from './types'
 
 /**
  * A short text language for writing a program quickly, in the spirit of Emmet abbreviations:
  *
- *   3/8x3, 4/4x2              3 bars of 3/8, then 2 bars of 4/4
+ *   3/8x3, 4/4x2              3 bars of 3/8, then 2 bars of 4/4 (two sections)
  *   4/4x8@140                 8 bars of 4/4 with its own tempo (140 BPM)
  *   7/8(2+2+3)x4              accents grouped 2+2+3
  *   intro:4/4x4, verse:3/4x8  named sections
- *   [3/4x2, 4/4]x3            a group repeated 3 times (groups can nest)
+ *   [2/4, 4/4]x3              one section: a bar of 2/4 then a bar of 4/4, played 3 times
+ *   riff:[7/8, 4/4x2]x4@150   a named group with its own tempo
  *
  * Items are separated by commas, semicolons or new lines; spaces are ignored. A section is
- * `[name:]beats/unit[(grouping)][xBars][@bpm]`: bars default to 1, `*` works like `x`, the unit is 2, 4, 8 or 16.
+ * `[name:]beats/unit[(grouping)][xBars][@bpm]` or `[name:][parts][xRepeats][@bpm]`, where the parts inside the
+ * brackets are `beats/unit[(grouping)][xBars]`. Bars and repeats default to 1, `*` works like `x`, the unit is 2, 4,
+ * 8 or 16. A group nested inside a group is written out in place (`[[2/4]x2, 3/4]` has the parts 2/4, 2/4, 3/4).
  */
 
-export interface ParsedSection {
-  name: string
+export interface ParsedPart {
   beatsPerBar: number
   beatUnit: BeatUnit
   /** Accent grouping written in the text, or null for the meter's usual feel. */
   grouping: number[] | null
   bars: number
+}
+
+export interface ParsedSection {
+  name: string
+  parts: ParsedPart[]
+  repeats: number
   tempo: number | null
 }
 
@@ -42,6 +59,8 @@ class ParseError extends Error {
 const NAME_RE = /[A-Za-z][\w-]*/y
 const INT_RE = /\d+/y
 
+const copyPart = (part: ParsedPart): ParsedPart => ({ ...part, grouping: part.grouping && [...part.grouping] })
+
 class Parser {
   private pos = 0
   private readonly text: string
@@ -51,16 +70,19 @@ class Parser {
   }
 
   parse(): ParsedSection[] {
-    const sections = this.list(null)
+    const sections: ParsedSection[] = []
+    this.items(null, () => {
+      sections.push(this.section())
+      if (sections.length > MAX_SECTIONS) this.fail(`A program has at most ${MAX_SECTIONS} sections`)
+    })
     this.skipSpace()
     if (this.pos < this.text.length) this.fail(`Unexpected "${this.text[this.pos]}"`)
     if (sections.length === 0) this.fail('Write at least one section, e.g. 4/4x4')
     return sections
   }
 
-  /** Items up to `close` (a "]") or the end of the text. */
-  private list(close: string | null): ParsedSection[] {
-    const out: ParsedSection[] = []
+  /** Reads separated items up to `close` (a "]") or the end of the text, calling `item` at the start of each. */
+  private items(close: string | null, item: () => void): void {
     for (;;) {
       this.skipSpace()
       // Empty items (",,", a trailing comma) are allowed.
@@ -68,30 +90,15 @@ class Parser {
         this.pos++
         this.skipSpace()
       }
-      if (this.pos >= this.text.length || this.text[this.pos] === close) return out
-      out.push(...this.item())
-      if (out.length > MAX_SECTIONS) this.fail(`A program has at most ${MAX_SECTIONS} sections`)
+      if (this.pos >= this.text.length || this.text[this.pos] === close) return
+      item()
       this.skipSpace()
-      if (this.pos >= this.text.length || this.text[this.pos] === close) return out
+      if (this.pos >= this.text.length || this.text[this.pos] === close) return
       if (!this.peekSeparator()) this.fail(`Expected "," between sections, found "${this.text[this.pos]}"`)
     }
   }
 
-  private item(): ParsedSection[] {
-    if (this.text[this.pos] === '[') {
-      const open = this.pos
-      this.pos++
-      const inner = this.list(']')
-      if (this.text[this.pos] !== ']') this.fail('Missing "]"', open)
-      this.pos++
-      if (inner.length === 0) this.fail('Empty group', open)
-      const times = this.repeat() ?? 1
-      if (inner.length * times > MAX_SECTIONS) this.fail(`A program has at most ${MAX_SECTIONS} sections`, open)
-      return Array.from({ length: times }, () => inner.map((s) => ({ ...s, grouping: s.grouping && [...s.grouping] }))).flat()
-    }
-    return [this.section()]
-  }
-
+  /** A top-level item: `[name:]` then a group or a single meter. */
   private section(): ParsedSection {
     const start = this.pos
     let name = ''
@@ -106,6 +113,73 @@ class Parser {
       name = nameMatch[0]
     }
 
+    if (this.text[this.pos] === '[') {
+      const open = this.pos
+      const parts = this.group()
+      let repeats: number | null = null
+      let tempo: number | null = null
+      for (;;) {
+        this.skipSpace()
+        const ch = this.text[this.pos]
+        if (this.isRepeat(ch) && repeats === null) {
+          repeats = this.repeat()
+          if (repeats !== null && repeats > MAX_SECTION_REPEATS) {
+            this.fail(`A section repeats at most ${MAX_SECTION_REPEATS} times`)
+          }
+        } else if (ch === '@' && tempo === null) {
+          tempo = this.tempo()
+        } else {
+          break
+        }
+      }
+      if (parts.length === 0) this.fail('Empty group', open)
+      return { name, parts, repeats: repeats ?? 1, tempo }
+    }
+
+    let tempo: number | null = null
+    const part = this.part(() => {
+      if (this.text[this.pos] !== '@' || tempo !== null) return false
+      tempo = this.tempo()
+      return true
+    })
+    return { name, parts: [part], repeats: 1, tempo }
+  }
+
+  /** `[ parts ]`: the parts of one section; a nested group with `xN` is written out N times. */
+  private group(): ParsedPart[] {
+    const open = this.pos
+    this.pos++
+    const parts: ParsedPart[] = []
+    const push = (more: ParsedPart[]) => {
+      parts.push(...more)
+      if (parts.length > MAX_SECTION_PARTS) this.fail(`A section has at most ${MAX_SECTION_PARTS} parts`, open)
+    }
+    this.items(']', () => {
+      if (this.text[this.pos] === '[') {
+        const inner = this.pos
+        const nested = this.group()
+        if (nested.length === 0) this.fail('Empty group', inner)
+        const times = this.repeat() ?? 1
+        if (nested.length * times > MAX_SECTION_PARTS) this.fail(`A section has at most ${MAX_SECTION_PARTS} parts`, open)
+        push(Array.from({ length: times }, () => nested.map(copyPart)).flat())
+        return
+      }
+      NAME_RE.lastIndex = this.pos
+      if (NAME_RE.test(this.text)) this.fail('Name the whole group instead, e.g. verse:[2/4, 4/4]x4')
+      push([
+        this.part(() => {
+          if (this.text[this.pos] === '@') this.fail('Put the tempo after the group, e.g. [2/4, 4/4]x4@120')
+          return false
+        }),
+      ])
+    })
+    if (this.text[this.pos] !== ']') this.fail('Missing "]"', open)
+    this.pos++
+    return parts
+  }
+
+  /** `beats/unit[(grouping)][xBars]`; `extra` may consume one more modifier (returns true when it did). */
+  private part(extra: () => boolean): ParsedPart {
     const beatsAt = this.pos
     const beatsPerBar = this.int('a time signature such as 4/4')
     if (beatsPerBar < 1 || beatsPerBar > MAX_BEATS_PER_BAR) {
@@ -121,27 +195,29 @@ class Parser {
 
     let grouping: number[] | null = null
     let bars: number | null = null
-    let tempo: number | null = null
     for (;;) {
       this.skipSpace()
       const ch = this.text[this.pos]
       if (ch === '(' && grouping === null) {
         grouping = this.grouping(beatsPerBar)
-      } else if ((ch === 'x' || ch === 'X' || ch === '*') && bars === null) {
+      } else if (this.isRepeat(ch) && bars === null) {
         bars = this.repeat()
         if (bars !== null && bars > MAX_SECTION_BARS) this.fail(`A section lasts at most ${MAX_SECTION_BARS} bars`)
-      } else if (ch === '@' && tempo === null) {
-        this.pos++
-        this.skipSpace()
-        const at = this.pos
-        tempo = this.int('a tempo after "@", e.g. @120')
-        if (tempo < MIN_BPM || tempo > MAX_BPM) this.fail(`Tempo must be ${MIN_BPM}–${MAX_BPM} BPM`, at)
-      } else {
+      } else if (!extra()) {
         break
       }
     }
 
-    return { name, beatsPerBar, beatUnit: unit as BeatUnit, grouping, bars: bars ?? 1, tempo }
+    return { beatsPerBar, beatUnit: unit as BeatUnit, grouping, bars: bars ?? 1 }
+  }
+
+  private tempo(): number {
+    this.pos++
+    this.skipSpace()
+    const at = this.pos
+    const tempo = this.int('a tempo after "@", e.g. @120')
+    if (tempo < MIN_BPM || tempo > MAX_BPM) this.fail(`Tempo must be ${MIN_BPM}–${MAX_BPM} BPM`, at)
+    return tempo
   }
 
   private grouping(beatsPerBar: number): number[] {
@@ -169,11 +245,14 @@ class Parser {
     return groups
   }
 
+  private isRepeat(ch: string | undefined): boolean {
+    return ch === 'x' || ch === 'X' || ch === '*'
+  }
+
   /** `xN` / `*N`, or null when there is none. */
   private repeat(): number | null {
     this.skipSpace()
-    const ch = this.text[this.pos]
-    if (ch !== 'x' && ch !== 'X' && ch !== '*') return null
+    if (!this.isRepeat(this.text[this.pos])) return null
     this.pos++
     this.skipSpace()
     const at = this.pos
@@ -204,7 +283,7 @@ class Parser {
   }
 }
 
-/** Parse program text such as "3/8x3, 4/4x2". Never throws. */
+/** Parse program text such as "3/8x3, [2/4, 4/4]x4". Never throws. */
 export function parseProgram(text: string): ParseResult {
   try {
     return { ok: true, sections: new Parser(text).parse() }
@@ -219,10 +298,13 @@ export function toSections(parsed: readonly ParsedSection[], firstNumber = 1): S
   return parsed.map((p, i) =>
     createSection({
       name: p.name || `Section ${firstNumber + i}`,
-      beatsPerBar: p.beatsPerBar,
-      beatUnit: p.beatUnit,
-      beats: p.grouping ? beatsFromGrouping(p.grouping) : defaultBeats(p.beatsPerBar, p.beatUnit),
-      bars: p.bars,
+      parts: p.parts.map((part) => ({
+        beatsPerBar: part.beatsPerBar,
+        beatUnit: part.beatUnit,
+        beats: part.grouping ? beatsFromGrouping(part.grouping) : defaultBeats(part.beatsPerBar, part.beatUnit),
+        bars: part.bars,
+      })),
+      repeats: p.repeats,
       tempo: p.tempo,
     }),
   )
@@ -230,24 +312,32 @@ export function toSections(parsed: readonly ParsedSection[], firstNumber = 1): S
 
 const DEFAULT_NAME_RE = /^Section \d+$/
 
+function partToText(part: Part): string {
+  // Plain accents read "(7)"; the meter's usual feel needs no grouping at all.
+  const grouping = matchingAccentGrouping(part.beats)
+  const usual = defaultGrouping(part.beatsPerBar, part.beatUnit) ?? [part.beatsPerBar]
+  const writeGrouping = grouping !== null && groupingKey(usual) !== groupingKey(grouping)
+  return [
+    `${part.beatsPerBar}/${part.beatUnit}`,
+    writeGrouping ? `(${groupingKey(grouping)})` : '',
+    part.bars !== 1 ? `x${part.bars}` : '',
+  ].join('')
+}
+
 /**
  * The program as text, to edit it in the quick entry. Keeps names that fit the syntax, signatures, accent groupings,
- * bars and tempos. Subdivisions and hand-edited accents have no syntax, so they are not kept.
+ * bars, parts, repeats and tempos. Subdivisions and hand-edited accents have no syntax, so they are not kept.
  */
 export function programToText(sections: readonly Section[]): string {
   return sections
     .map((s) => {
       const name = s.name.trim()
       const keepName = name !== '' && !DEFAULT_NAME_RE.test(name) && /^[A-Za-z][\w-]*$/.test(name)
-      // Plain accents read "(7)"; the meter's usual feel needs no grouping at all.
-      const grouping = matchingAccentGrouping(s.beats)
-      const usual = defaultGrouping(s.beatsPerBar, s.beatUnit) ?? [s.beatsPerBar]
-      const writeGrouping = grouping !== null && groupingKey(usual) !== groupingKey(grouping)
+      const single = s.parts.length === 1 && s.repeats === 1
       return [
         keepName ? `${name}:` : '',
-        `${s.beatsPerBar}/${s.beatUnit}`,
-        writeGrouping ? `(${groupingKey(grouping)})` : '',
-        s.bars !== 1 ? `x${s.bars}` : '',
+        single ? partToText(s.parts[0]) : `[${s.parts.map(partToText).join(', ')}]`,
+        !single && s.repeats !== 1 ? `x${s.repeats}` : '',
         s.tempo !== null ? `@${s.tempo}` : '',
       ].join('')
     })

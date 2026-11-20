@@ -1,7 +1,6 @@
 import { useId, useState, type FormEvent } from 'react'
 import { MAX_SECTIONS } from '../../core/constants'
 import { parseProgram, programToText, toSections } from '../../core/programText'
-import { toCurrent } from '../../core/settings'
 import type { Settings } from '../../core/types'
 import type { SettingsUpdater } from '../../state/useSettings'
 import { EditIcon, PlusIcon } from '../icons/icons'
@@ -14,17 +13,19 @@ interface ProgramQuickEntryProps {
   onStatus: (message: string) => void
 }
 
-const EXAMPLE = '3/8x3, 4/4x2@140, [7/8(2+2+3)x2, 4/4]x2'
+const EXAMPLE = '3/8x3, 4/4x2@140, riff:[2/4, 4/4]x4'
 const SYNTAX_HELP =
   'beats/unit, then xBars, @tempo, (grouping) — e.g. 4/4x8@140, 7/8(2+2+3)x2. ' +
-  'Name a section with name: (verse:3/4x8). Repeat a group with [ … ]x3. Separate sections with commas.'
+  'Name a section with name: (verse:3/4x8). [2/4, 4/4]x4 is one section mixing meters, played 4 times. ' +
+  'Separate sections with commas.'
 
 function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? '' : 's'}`
 }
 
 /**
- * Type a whole program in one line, Emmet style: "3/8x3, 4/4x2" makes 3 bars of 3/8 then 2 of 4/4.
+ * Type a whole program in one line, Emmet style: "3/8x3, 4/4x2" makes 3 bars of 3/8 then 2 of 4/4, and
+ * "[2/4, 4/4]x4" one section of a 2/4 bar and a 4/4 bar, played 4 times.
  * Enter replaces the program (and switches program mode on); Append adds to the end.
  */
 export function ProgramQuickEntry({ settings, onChange, onStatus }: ProgramQuickEntryProps) {
@@ -39,13 +40,7 @@ export function ProgramQuickEntry({ settings, onChange, onStatus }: ProgramQuick
     e?.preventDefault()
     if (!parsed) return
     const sections = toSections(parsed)
-    onChange((prev) => ({
-      ...prev,
-      sections,
-      activeSection: 0,
-      current: toCurrent(sections[0]),
-      program: { ...prev.program, enabled: true },
-    }))
+    onChange((prev) => ({ ...prev, sections, selected: null, program: { ...prev.program, enabled: true } }))
     setText('')
     onStatus(`Program replaced: ${plural(sections.length, 'section')}.`)
   }
@@ -67,7 +62,10 @@ export function ProgramQuickEntry({ settings, onChange, onStatus }: ProgramQuick
   if (result === null) {
     preview = SYNTAX_HELP
   } else if (result.ok) {
-    const bars = result.sections.reduce((sum, s) => sum + s.bars, 0)
+    const bars = result.sections.reduce(
+      (sum, s) => sum + s.repeats * s.parts.reduce((partBars, part) => partBars + part.bars, 0),
+      0,
+    )
     preview = `${plural(result.sections.length, 'section')} · ${plural(bars, 'bar')} — Enter replaces the program`
     tone = ' is-ok'
   } else {

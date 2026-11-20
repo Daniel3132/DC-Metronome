@@ -32,10 +32,10 @@ export interface ShortcutInfo {
 export const SHORTCUTS: readonly ShortcutInfo[] = [
   { keys: ['Space'], description: 'Start / stop' },
   { keys: ['T'], description: 'Tap tempo' },
-  { keys: ['↑'], description: 'Tempo +1 BPM' },
-  { keys: ['↓'], description: 'Tempo −1 BPM' },
-  { keys: ['Shift', '↑'], description: 'Tempo +10 BPM' },
-  { keys: ['Shift', '↓'], description: 'Tempo −10 BPM' },
+  { keys: ['→'], description: 'Tempo +1 BPM' },
+  { keys: ['←'], description: 'Tempo −1 BPM' },
+  { keys: ['Shift', '→'], description: 'Tempo +10 BPM' },
+  { keys: ['Shift', '←'], description: 'Tempo −10 BPM' },
   { keys: ['+'], description: 'Tempo % +5' },
   { keys: ['−'], description: 'Tempo % −5' },
   { keys: ['M'], description: 'Mute / unmute' },
@@ -116,12 +116,13 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers): void {
       return
     }
 
-    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    // Left / right, the same way the tempo slider moves.
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
       if (e.defaultPrevented) return
       if (e.target instanceof Element && e.target.closest(ARROW_OWNERS)) return
       e.preventDefault()
       const step = e.shiftKey ? BPM_BIG_STEP : BPM_STEP
-      handlers.nudgeBpm(e.key === 'ArrowUp' ? step : -step)
+      handlers.nudgeBpm(e.key === 'ArrowRight' ? step : -step)
       return
     }
 

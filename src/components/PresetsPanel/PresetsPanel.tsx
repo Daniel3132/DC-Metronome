@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent, t
 import { STORAGE_KEYS } from '../../core/constants'
 import { makeId, sanitizeSettings } from '../../core/settings'
 import { FACTORY_PRESETS, type FactoryPreset } from '../../state/factoryPresets'
-import { applyFactoryPreset, applyPreset, describeSettings, suggestedName } from '../../state/presetSummary'
+import { applyFactoryPreset, applyPreset, describeFactoryPreset, describeSettings, suggestedName } from '../../state/presetSummary'
 import { clearStoredData, loadPresets, savePresets, type Preset } from '../../state/storage'
 import { CheckIcon, DownloadIcon, EditIcon, SaveIcon, TrashIcon, UploadIcon, XIcon } from '../icons/icons'
 import type { PanelProps } from '../panelTypes'
@@ -82,7 +82,7 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
 
   async function clearAll() {
     const ok = window.confirm(
-      'Clear all stored data?\n\nThis deletes your settings, presets, program templates and uploaded sounds from this browser. It cannot be undone.',
+      'Clear all stored data?\n\nThis deletes your settings, presets and uploaded sounds from this browser. It cannot be undone.',
     )
     if (!ok) return
     await clearStoredData()
@@ -247,7 +247,7 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
     <div className="presets-panel">
       <Panel
         title="Save preset"
-        description="Save everything you set up (tempo, sections, trainers, sounds) to come back to it later."
+        description="Save everything you set up (tempo, signature, accents, program, trainers, sounds) to come back to it later."
       >
         <form className="presets-panel__save" onSubmit={saveCurrent}>
           <label htmlFor={saveInputId} className="ui-field-label">
@@ -412,9 +412,9 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
           {FACTORY_PRESETS.map((preset) => (
             <li key={preset.id} className="presets-panel__item">
               <div className="presets-panel__row">
-                <div className="presets-panel__info">
+                <div className="presets-panel__info" title={preset.description}>
                   <span className="presets-panel__name">{preset.name}</span>
-                  <span className="presets-panel__meta">{preset.description}</span>
+                  <span className="presets-panel__meta tabular">{describeFactoryPreset(preset)}</span>
                 </div>
                 <div className="presets-panel__actions">
                   <Button size="sm" aria-label={`Load ${preset.name}`} onClick={() => loadFactory(preset)}>
@@ -430,7 +430,7 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
 
       <Panel
         title="Stored data"
-        description="Everything is kept in this browser only. Clearing it removes your settings, presets, program templates and uploaded sounds, and restarts the app with factory defaults."
+        description="Everything is kept in this browser only. Clearing it removes your settings, presets and uploaded sounds, and restarts the app with factory defaults."
       >
         <div className="presets-panel__actions">
           <Button variant="danger" size="sm" icon={<TrashIcon />} onClick={() => void clearAll()}>

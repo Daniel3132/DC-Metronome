@@ -1,16 +1,7 @@
 import { deleteCustomSoundsDb } from '../audio/customSounds'
 import { STORAGE_KEYS } from '../core/constants'
 import { createDefaultSettings, makeId, sanitizeSettings } from '../core/settings'
-import type { Section, Settings } from '../core/types'
-
-/** A saved program: its sections and whether it loops (no tempo, sounds or trainers, unlike a preset). */
-export interface ProgramTemplate {
-  id: string
-  name: string
-  sections: Section[]
-  loop: boolean
-  createdAt: number
-}
+import type { Settings } from '../core/types'
 
 export interface Preset {
   id: string
@@ -29,7 +20,7 @@ function readJson(key: string): unknown {
   }
 }
 
-/** Every localStorage key of the app starts with this (settings, presets, templates, UI conveniences). */
+/** Every localStorage key of the app starts with this (settings, presets, UI conveniences). */
 const KEY_PREFIX = 'dcmetronome.'
 
 /** Set once the stored data was cleared: later writes (e.g. the save on page hide) must not bring it back. */
@@ -67,10 +58,38 @@ export function saveSettings(settings: Settings): void {
   writeJson(STORAGE_KEYS.settings, settings)
 }
 
+/**
+ * Older versions saved programs apart from presets, as "program templates" (sections and loop only). A preset holds
+ * everything, so each template becomes a preset with the default setup, its sections, and program mode on. Runs once:
+ * the templates are removed afterwards.
+ */
+function migrateTemplates(presets: unknown[]): unknown[] {
+  const raw = readJson(STORAGE_KEYS.templates)
+  if (raw === null) return presets
+  const converted = (Array.isArray(raw) ? raw : []).filter(isRecord).map((item) => ({
+    id: item.id,
+    name: typeof item.name === 'string' && item.name.trim() !== '' ? item.name : 'Program',
+    createdAt: item.createdAt,
+    settings: {
+      ...createDefaultSettings(),
+      sections: item.sections,
+      program: { enabled: true, loop: typeof item.loop === 'boolean' ? item.loop : true },
+    },
+  }))
+  const merged = [...presets, ...converted]
+  writeJson(STORAGE_KEYS.presets, merged)
+  try {
+    globalThis.localStorage?.removeItem(STORAGE_KEYS.templates)
+  } catch {
+    // Storage unavailable: nothing to remove.
+  }
+  return merged
+}
+
 /** User presets saved under STORAGE_KEYS.presets, each preset's settings sanitized; [] when absent or unreadable. */
 export function loadPresets(): Preset[] {
-  const raw = readJson(STORAGE_KEYS.presets)
-  if (!Array.isArray(raw)) return []
+  const stored = readJson(STORAGE_KEYS.presets)
+  const raw = migrateTemplates(Array.isArray(stored) ? stored : [])
   const seen = new Set<string>()
   const presets: Preset[] = []
   for (const item of raw) {
@@ -92,7 +111,7 @@ export function savePresets(presets: Preset[]): void {
 }
 
 /**
- * Erase everything the app stored in this browser: settings, presets, program templates, UI preferences
+ * Erase everything the app stored in this browser: settings, presets, UI preferences
  * (localStorage keys starting with "dcmetronome.") and uploaded sounds (IndexedDB). Settings changes made after
  * this are no longer saved, so reload the page right after it to start from factory defaults.
  */
@@ -110,29 +129,4 @@ export async function clearStoredData(): Promise<void> {
     // Storage unavailable: nothing was stored there either.
   }
   await deleteCustomSoundsDb()
-}
-
-/** Program templates saved under STORAGE_KEYS.templates, sections sanitized; [] when absent or unreadable. */
-export function loadTemplates(): ProgramTemplate[] {
-  const raw = readJson(STORAGE_KEYS.templates)
-  if (!Array.isArray(raw)) return []
-  const seen = new Set<string>()
-  const templates: ProgramTemplate[] = []
-  for (const item of raw) {
-    if (!isRecord(item)) continue
-    let id = typeof item.id === 'string' && item.id !== '' ? item.id : makeId()
-    if (seen.has(id)) id = makeId()
-    seen.add(id)
-    const name = typeof item.name === 'string' && item.name.trim() !== '' ? item.name.trim() : 'Template'
-    const createdAt = typeof item.createdAt === 'number' && Number.isFinite(item.createdAt) ? item.createdAt : 0
-    // The settings sanitizer already knows how to repair a section list.
-    const { sections } = safeSanitize({ sections: item.sections })
-    templates.push({ id, name, sections, loop: typeof item.loop === 'boolean' ? item.loop : true, createdAt })
-  }
-  return templates
-}
-
-/** Persist program templates. Swallows quota/availability errors. */
-export function saveTemplates(templates: ProgramTemplate[]): void {
-  writeJson(STORAGE_KEYS.templates, templates)
 }

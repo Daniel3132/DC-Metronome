@@ -1,19 +1,22 @@
 import type { CSSProperties } from 'react'
 import { getSubdivision } from '../../core/constants'
 import { cycleBeatLevel } from '../../core/meter'
-import { updateSectionById } from '../../core/settings'
-import type { BeatLevel, PulseEvent, Section } from '../../core/types'
+import { updatePart } from '../../core/settings'
+import type { BeatLevel, PartRef, PulseEvent, Rhythm } from '../../core/types'
 import type { SettingsUpdater } from '../../state/useSettings'
 import { XIcon } from '../icons/icons'
 import { Badge } from '../ui/ui'
 import './BeatGrid.css'
 
 interface BeatGridProps {
-  section: Section
-  /** Show the section name in the header (when the program has several sections). */
-  showName: boolean
+  /** The bar shown: a program section part, or the free rhythm. */
+  rhythm: Rhythm
+  /** Which part the pads edit; null for the free rhythm. */
+  target: PartRef | null
+  /** Shown in the header (section name, and part number in sections with several parts); null shows none. */
+  name: string | null
   onChange: SettingsUpdater
-  /** The pulse sounding now when it belongs to `section`; null when stopped or another section plays. */
+  /** The pulse sounding now when it belongs to `rhythm`; null when stopped or another part plays. */
   pulse: PulseEvent | null
 }
 
@@ -29,7 +32,7 @@ function columnsFor(beats: number): number {
   return beats <= 8 ? beats : Math.ceil(beats / 2)
 }
 
-export function BeatGrid({ section, showName, onChange, pulse }: BeatGridProps) {
+export function BeatGrid({ rhythm: section, target, name, onChange, pulse }: BeatGridProps) {
   const subdivision = getSubdivision(section.subdivision)
   const offsets = subdivision.pulses
   // pulse.pulse indexes the pattern it was produced with; only trust it while the pattern is unchanged.
@@ -37,9 +40,8 @@ export function BeatGrid({ section, showName, onChange, pulse }: BeatGridProps) 
   const gapBar = pulse?.gapBar ?? false
 
   function cycle(beat: number) {
-    const id = section.id
     onChange((prev) =>
-      updateSectionById(prev, id, (s) => ({
+      updatePart(prev, target, (s) => ({
         ...s,
         beats: s.beats.map((level, i) => (i === beat ? cycleBeatLevel(level) : level)),
       })),
@@ -50,7 +52,7 @@ export function BeatGrid({ section, showName, onChange, pulse }: BeatGridProps) 
     <section className={`beat-grid${gapBar ? ' is-gap' : ''}`} aria-label="Beats">
       <header className="beat-grid__header">
         <p className="beat-grid__meter">
-          {showName && <span className="beat-grid__name">{section.name || 'Section'}</span>}
+          {name !== null && <span className="beat-grid__name">{name}</span>}
           <span className="beat-grid__signature tabular">
             {section.beatsPerBar}/{section.beatUnit}
           </span>

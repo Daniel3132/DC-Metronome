@@ -8,8 +8,8 @@ import {
   matchingAccentGrouping,
   QUICK_SIGNATURES,
 } from '../../core/meter'
-import { defaultBeats, updateSectionById } from '../../core/settings'
-import type { BeatUnit, GapSettings, PracticeSettings, Section, Settings, SubdivisionId } from '../../core/types'
+import { defaultBeats, findPart, practiceAt, practiceWithStart, updateEditedPart, withBpm } from '../../core/settings'
+import type { BeatUnit, GapSettings, Part, PracticeSettings, Settings, SubdivisionId } from '../../core/types'
 import type { SettingsUpdater } from '../../state/useSettings'
 import { MasterVolume } from '../MasterVolume/MasterVolume'
 import { RhythmNotation } from '../RhythmNotation/RhythmNotation'
@@ -38,8 +38,6 @@ const SUBDIVISION_CHIPS = COMMON_SUBDIVISIONS.map((id) => ({
 const SIGNATURE_CHIPS = COMMON_SIGNATURES.map((sig) => ({ value: sig as string, label: sig }))
 
 const GAP_PATTERNS = ['1:1', '2:1', '3:1', '4:1', '2:2', '4:4'] as const
-/** Value of the accents picker when the beats match no pattern (edited on the beat pads). */
-const CUSTOM = 'custom'
 
 function gapLabel(play: number, mute: number): string {
   return `${play}:${mute}`
@@ -80,14 +78,16 @@ function Cell({ label, aside, kind, children }: CellProps) {
 /**
  * The main tab's controls as a grid of small cells: signature, subdivision, accents, rest bar (gap trainer), voice, volume
  * and the speed trainer. Each shows the most used choices and a compact picker for the rest.
+ * Signature, subdivision and accents edit the selected program section part directly (the program shows which), or
+ * the free rhythm when no section is selected.
  */
 export function QuickControls({ settings, onChange, getLevel, active }: QuickControlsProps) {
   const { gap, voice, practice } = settings
-  // The working rhythm: saved into the selected program section only with "Save section".
-  const section = settings.current
+  const target = findPart(settings, settings.selected)
+  const section = target?.part ?? settings.current
 
-  function updateSection(fn: (s: Section) => Section) {
-    onChange((prev) => updateSectionById(prev, prev.current.id, fn))
+  function updateSection(fn: (part: Part) => Part) {
+    onChange((prev) => updateEditedPart(prev, fn))
   }
   const setGap = (patch: Partial<GapSettings>) => onChange((prev) => ({ ...prev, gap: { ...prev.gap, ...patch } }))
   const setPractice = (patch: Partial<PracticeSettings>) =>
@@ -105,20 +105,16 @@ export function QuickControls({ settings, onChange, getLevel, active }: QuickCon
     updateSection((s) => ({ ...s, beatsPerBar: count, beatUnit: unit, beats: defaultBeats(count, unit) }))
   }
 
-  // Accents: plain (accent on 1 only) or a grouping, as chips; hand-edited pads light up the Custom chip. Custom is
-  // always there (it cannot be picked, only reached on the pads) so the chips do not move when it applies.
+  // Accents: plain (accent on 1 only) or a grouping, as chips. Accents edited on the beat pads match no chip, so
+  // none is lit.
   const matching = matchingAccentGrouping(section.beats)
-  const accentValue = matching ? groupingKey(matching) : CUSTOM
-  const accentChips: SegmentedOption<string>[] = [
-    ...accentGroupings(section.beatsPerBar).map((g) => ({
-      value: groupingKey(g),
-      label: g.length === 1 ? 'Plain' : groupingKey(g),
-      title: g.length === 1 ? `Plain: accent on 1 only` : `Accents grouped ${groupingKey(g)}`,
-    })),
-    { value: CUSTOM, label: 'Custom', title: 'Set on the beat pads (click a pad to change it)', disabled: true },
-  ]
+  const accentValue = matching ? groupingKey(matching) : ''
+  const accentChips: SegmentedOption<string>[] = accentGroupings(section.beatsPerBar).map((g) => ({
+    value: groupingKey(g),
+    label: g.length === 1 ? 'Plain' : groupingKey(g),
+    title: g.length === 1 ? `Plain: accent on 1 only` : `Accents grouped ${groupingKey(g)}`,
+  }))
   const setGrouping = (key: string) => {
-    if (key === CUSTOM) return
     const groups = key.split('+').map(Number)
     updateSection((s) => ({ ...s, beats: beatsFromGrouping(groups) }))
   }
@@ -233,7 +229,8 @@ export function QuickControls({ settings, onChange, getLevel, active }: QuickCon
               size="sm"
               label="Speed trainer"
               checked={practice.enabled}
-              onChange={(enabled) => setPractice({ enabled })}
+              // The trainer aims at the main tempo; older settings may have drifted apart.
+              onChange={(enabled) => onChange((prev) => ({ ...prev, practice: { ...practiceAt(prev.practice, prev.bpm), enabled } }))}
             />
           }
         >
@@ -244,7 +241,7 @@ export function QuickControls({ settings, onChange, getLevel, active }: QuickCon
               value={practice.startBpm}
               min={MIN_BPM}
               max={MAX_BPM}
-              onChange={(startBpm) => setPractice({ startBpm })}
+              onChange={(startBpm) => onChange((prev) => ({ ...prev, practice: practiceWithStart(prev.practice, startBpm) }))}
             />
             <Stepper
               label="Target BPM"
@@ -252,7 +249,8 @@ export function QuickControls({ settings, onChange, getLevel, active }: QuickCon
               value={practice.targetBpm}
               min={MIN_BPM}
               max={MAX_BPM}
-              onChange={(targetBpm) => setPractice({ targetBpm })}
+              // The target is the main tempo: changing one changes the other (and the start keeps its ratio).
+              onChange={(targetBpm) => onChange((prev) => withBpm(prev, targetBpm))}
             />
             <Stepper
               label="Step BPM"

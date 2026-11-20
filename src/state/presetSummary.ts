@@ -1,4 +1,4 @@
-import { sanitizeSettings } from '../core/settings'
+import { editedPart, sanitizeSettings } from '../core/settings'
 import type { Settings } from '../core/types'
 import type { FactoryPreset } from './factoryPresets'
 
@@ -8,7 +8,7 @@ function plural(count: number, word: string): string {
 
 /** One line about what a preset plays: "120 BPM · 4 sections · gap 2:1 · voice". */
 export function describeSettings(s: Settings): string {
-  const section = s.current
+  const section = editedPart(s)
   const parts = [
     s.practice.enabled ? `${s.practice.startBpm} → ${s.practice.targetBpm} BPM` : `${s.bpm} BPM`,
     s.program.enabled ? `program, ${plural(s.sections.length, 'section')}` : `${section.beatsPerBar}/${section.beatUnit}`,
@@ -19,9 +19,14 @@ export function describeSettings(s: Settings): string {
   return parts.join(' · ')
 }
 
+/** The same one-line summary as a saved preset gets, for a factory preset. */
+export function describeFactoryPreset(preset: FactoryPreset): string {
+  return describeSettings(preset.build())
+}
+
 /** Default name for saving the current setup. */
 export function suggestedName(s: Settings): string {
-  const section = s.current
+  const section = editedPart(s)
   return s.program.enabled
     ? `Program, ${plural(s.sections.length, 'section')}`
     : `${s.bpm} BPM ${section.beatsPerBar}/${section.beatUnit}`

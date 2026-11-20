@@ -93,7 +93,7 @@
 
 /* ---- Program body ---- */
 
-/* Text entry and templates share one row (two on narrow screens). */
+/* The text entry takes the whole row. */
 .program-panel__tools {
   display: flex;
   flex-wrap: wrap;
@@ -113,14 +113,6 @@
 .program-panel__tools .program-quick__input {
   flex: 1 1 auto;
   width: 0;
-}
-
-.program-panel__tools .program-templates {
-  flex: 1 1 auto;
-}
-
-.program-panel__tools .program-templates__select {
-  width: 10rem;
 }
 
 .main-panel .program-panel .ui-select-input,
@@ -352,4 +344,14 @@
 /* Minimized: nothing but the header (the screen-reader status line takes no room either). */
 .main-panel .is-collapsed .ui-panel-body {
   display: contents;
+}
+
+/* The section editor runs as compact as the rest of the card. */
+.main-panel .program-panel__group {
+  gap: 6px;
+}
+
+.main-panel .program-panel__parts-row .ui-stepper {
+  flex: none;
+  gap: 2px;
 }

@@ -10,14 +10,14 @@ import {
 } from './constants'
 import { resizeBeats } from './meter'
 import { createSequencer, type Sequencer } from './sequencer'
-import { createDefaultSettings, createSection } from './settings'
+import { createDefaultPlaybackSettings, createPlaySection } from './settings'
 import type {
   BeatLevel,
   PracticeAtTarget,
   PracticeSettings,
   PulseEvent,
-  Section,
-  Settings,
+  PlaySection,
+  PlaybackSettings,
   SubdivisionId,
 } from './types'
 
@@ -27,17 +27,17 @@ const TOLERANCE = 1e-9
 
 let idCounter = 0
 
-function section(partial: Partial<Section> = {}): Section {
+function section(partial: Partial<PlaySection> = {}): PlaySection {
   const { id, ...rest } = partial
-  return { ...createSection(rest), id: id ?? `section-${idCounter++}` }
+  return { ...createPlaySection(rest), id: id ?? `section-${idCounter++}` }
 }
 
-function makeSettings(patch: Partial<Settings> = {}): Settings {
-  return { ...createDefaultSettings(), sections: [section({ id: 'main' })], ...patch }
+function makeSettings(patch: Partial<PlaybackSettings> = {}): PlaybackSettings {
+  return { ...createDefaultPlaybackSettings(), sections: [section({ id: 'main' })], ...patch }
 }
 
-/** Settings with section `index` patched; changing beatsPerBar re-fits beats like the UI does. */
-function patchSection(settings: Settings, index: number, patch: Partial<Section>): Settings {
+/** PlaybackSettings with section `index` patched; changing beatsPerBar re-fits beats like the UI does. */
+function patchSection(settings: PlaybackSettings, index: number, patch: Partial<PlaySection>): PlaybackSettings {
   return {
     ...settings,
     sections: settings.sections.map((s, i) => {
@@ -49,7 +49,7 @@ function patchSection(settings: Settings, index: number, patch: Partial<Section>
 }
 
 function practice(patch: Partial<PracticeSettings> = {}): PracticeSettings {
-  return { enabled: true, startBpm: 100, targetBpm: 110, stepBpm: 5, everyBars: 2, atTarget: 'hold', ...patch }
+  return { enabled: true, startBpm: 100, targetBpm: 110, targetRatio: 1.1, stepBpm: 5, everyBars: 2, atTarget: 'hold', ...patch }
 }
 
 function expectTime(actual: number, expected: number, tolerance = TOLERANCE) {
@@ -59,7 +59,7 @@ function expectTime(actual: number, expected: number, tolerance = TOLERANCE) {
 }
 
 /** Takes `count` pulses, checking that peekTime() always predicts next(). */
-function take(seq: Sequencer, settings: Settings, count: number): PulseEvent[] {
+function take(seq: Sequencer, settings: PlaybackSettings, count: number): PulseEvent[] {
   const events: PulseEvent[] = []
   for (let i = 0; i < count; i++) {
     const peek = seq.peekTime(settings)
@@ -72,7 +72,7 @@ function take(seq: Sequencer, settings: Settings, count: number): PulseEvent[] {
 }
 
 /** Pulses until the sequence ends (or `limit`), checking peek/next agreement. */
-function takeAll(seq: Sequencer, settings: Settings, limit = 10000): PulseEvent[] {
+function takeAll(seq: Sequencer, settings: PlaybackSettings, limit = 10000): PulseEvent[] {
   const events: PulseEvent[] = []
   for (let i = 0; i < limit; i++) {
     const peek = seq.peekTime(settings)
@@ -88,7 +88,7 @@ function takeAll(seq: Sequencer, settings: Settings, limit = 10000): PulseEvent[
 }
 
 /** The first pulse of each of the next `bars` bars (fewer if the sequence ends). */
-function barStarts(seq: Sequencer, settings: Settings, bars: number): PulseEvent[] {
+function barStarts(seq: Sequencer, settings: PlaybackSettings, bars: number): PulseEvent[] {
   const starts: PulseEvent[] = []
   let guard = 0
   while (starts.length < bars && guard++ < 100000) {
@@ -474,7 +474,7 @@ describe('live edits', () => {
 // --- Gap trainer ---
 
 describe('gap trainer', () => {
-  function silentBars(settings: Settings, bars: number): number[] {
+  function silentBars(settings: PlaybackSettings, bars: number): number[] {
     const events = take(createSequencer(settings, 0), settings, bars * 4 * 2)
     const silent = new Set<number>()
     for (const event of events) {
@@ -497,7 +497,7 @@ describe('gap trainer', () => {
 
   const base = makeSettings({
     sections: [section({ subdivision: 'eighths' })],
-    voice: { enabled: true, pack: 'en-male', subdivisions: true, clicks: true },
+    voice: { enabled: true, pack: 'en-male', subdivisions: true, clicks: true, announceSections: false },
   })
 
   it('plays 2 bars, then silences 1', () => {
@@ -565,7 +565,7 @@ describe('gap trainer', () => {
   })
 
   it('counts across program sections', () => {
-    const settings: Settings = {
+    const settings: PlaybackSettings = {
       ...base,
       sections: [section({ bars: 1 }), section({ bars: 1, beatsPerBar: 3 })],
       program: { enabled: true, loop: true },
@@ -627,7 +627,7 @@ describe('random mute', () => {
   })
 
   it('yields to the gap trainer and overrides muted beats', () => {
-    const combined: Settings = {
+    const combined: PlaybackSettings = {
       ...settings,
       sections: [section({ beats: ['accent', 'mute', 'normal', 'normal'] })],
       gap: { enabled: true, playBars: 1, muteBars: 1 },
@@ -683,11 +683,12 @@ describe('beat levels', () => {
 // --- Voice ---
 
 describe('voice counting', () => {
-  const voice = (patch: Partial<Settings['voice']> = {}): Settings['voice'] => ({
+  const voice = (patch: Partial<PlaybackSettings['voice']> = {}): PlaybackSettings['voice'] => ({
     enabled: true,
     pack: 'en-male',
     subdivisions: false,
     clicks: true,
+    announceSections: false,
     ...patch,
   })
 
@@ -944,7 +945,7 @@ describe('program mode', () => {
 // --- Practice mode ---
 
 describe('practice mode', () => {
-  function practiceBars(patch: Partial<PracticeSettings>, bars: number, extra: Partial<Settings> = {}) {
+  function practiceBars(patch: Partial<PracticeSettings>, bars: number, extra: Partial<PlaybackSettings> = {}) {
     const settings = makeSettings({ practice: practice(patch), ...extra })
     return barStarts(createSequencer(settings, 0), settings, bars)
   }
@@ -1169,7 +1170,7 @@ describe('robustness', () => {
           bars: int(1, 4),
           tempo: rand() < 0.5 ? null : int(MIN_BPM, MAX_BPM),
         })
-      const fixBeats = (s: Section): Section => ({ ...s, beats: resizeBeats(s.beats, s.beatsPerBar) })
+      const fixBeats = (s: PlaySection): PlaySection => ({ ...s, beats: resizeBeats(s.beats, s.beatsPerBar) })
 
       let settings = makeSettings({ sections: [fixBeats(randomSection())] })
       let seq = createSequencer(settings, 0, { random: rand })
@@ -1225,6 +1226,7 @@ describe('robustness', () => {
                   enabled: rand() < 0.5,
                   startBpm: int(MIN_BPM, MAX_BPM),
                   targetBpm: int(MIN_BPM, MAX_BPM),
+                  targetRatio: 1,
                   stepBpm: int(1, 50),
                   everyBars: int(1, 3),
                   atTarget: pick(atTargets),
