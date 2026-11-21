@@ -44,9 +44,13 @@
   /* Beat levels (beat editor pads, beat indicator). */
   --level-accent: var(--accent);
   --level-normal: #c7d0dd;
-  --level-medium: color-mix(in srgb, var(--accent), black 22%);
+  /* Sub-accents get their own hue (amber; with relative colors, opposite the accent below). */
+  --level-medium: #f5a524;
   --level-soft: #5f6a7b;
   --level-mute: #2b313c;
+
+  /* Height of a preset card (name and two lines of summary). */
+  --preset-card-h: 60px;
 
   /* Radii */
   --radius-xs: 4px;
@@ -147,7 +151,7 @@
 
     --level-accent: var(--accent);
     --level-normal: #3b4554;
-    --level-medium: color-mix(in srgb, var(--accent), white 35%);
+    --level-medium: #c26a00;
     --level-soft: #9ba6b5;
     --level-mute: #dfe4ea;
 
@@ -350,4 +354,16 @@ fieldset {
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
+}
+
+/* Sub-accents opposite the accent on the color wheel, so they stand apart from it with any theme. */
+@supports (color: oklch(from red l c h)) {
+  :root {
+    --level-medium: oklch(from var(--accent) 0.8 0.15 calc(h + 150));
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --level-medium: oklch(from var(--accent) 0.6 0.15 calc(h + 150));
+    }
+  }
 }

@@ -110,6 +110,17 @@ export function savePresets(presets: Preset[]): void {
   writeJson(STORAGE_KEYS.presets, presets)
 }
 
+/** The id of the saved preset loaded last; null when none. Older versions stored { kind, id }. */
+export function loadActivePreset(): string | null {
+  const raw = readJson(STORAGE_KEYS.activePreset)
+  if (typeof raw === 'string') return raw
+  return isRecord(raw) && raw.kind === 'saved' && typeof raw.id === 'string' ? raw.id : null
+}
+
+export function saveActivePreset(id: string | null): void {
+  writeJson(STORAGE_KEYS.activePreset, id)
+}
+
 /**
  * Erase everything the app stored in this browser: settings, presets, UI preferences
  * (localStorage keys starting with "dcmetronome.") and uploaded sounds (IndexedDB). Settings changes made after

@@ -15,24 +15,20 @@ import {
   editedPart,
   effectiveBpm,
   findPart,
-  makeId,
   sectionBars,
   selectPart,
   selectSection,
 } from '../../core/settings'
 import type { Part, Section, Settings } from '../../core/types'
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
   CheckIcon,
-  CopyIcon,
   GripIcon,
   PlusIcon,
   TrashIcon,
   XIcon,
 } from '../icons/icons'
 import type { PanelProps } from '../panelTypes'
-import { Button, IconButton, Panel, Stepper, Toggle } from '../ui/ui'
+import { Button, Panel, Stepper, Toggle } from '../ui/ui'
 import { ProgramQuickEntry } from './ProgramQuickEntry'
 import { useReorder } from './useReorder'
 import './ProgramPanel.css'
@@ -172,41 +168,13 @@ export function ProgramPanel({
     if (editing) movePart(editing.id, from, to)
   })
 
-  /** Move by one with the buttons or Alt+arrows; focus follows the moved cell, or stays on the move buttons. */
-  function stepSection(index: number, delta: -1 | 1, focus: 'cell' | 'buttons') {
+  /** Move by one with Alt+arrows; focus follows the moved cell. */
+  function stepSection(index: number, delta: -1 | 1) {
     const to = index + delta
     const section = sections[index]
     if (!section || to < 0 || to >= sections.length) return
     moveSection(index, to)
-    if (focus === 'cell') {
-      focusRequest.current = { id: elId(section.id, 'cell'), select: false }
-    } else {
-      // At either end the button that was used becomes disabled, so focus its opposite.
-      const atEdge = to === 0 || to === sections.length - 1
-      const part = delta < 0 ? (atEdge ? 'down' : 'up') : atEdge ? 'up' : 'down'
-      focusRequest.current = { id: elId(section.id, part), select: false }
-    }
-  }
-
-  function duplicate(section: Section, index: number) {
-    if (!canAdd) return
-    const parts = section.parts.map((p) => ({ ...p, id: makeId(), beats: [...p.beats] }))
-    const copy: Section = {
-      ...section,
-      id: makeId(),
-      name: section.name.trim() ? `${section.name.trim()} copy`.slice(0, NAME_MAX_LENGTH) : '',
-      parts,
-    }
-    const partIndex = selected?.section.id === section.id ? selected.partIndex : 0
-    onChange((prev) => {
-      if (prev.sections.length >= MAX_SECTIONS) return prev
-      const from = prev.sections.findIndex((s) => s.id === section.id)
-      const at = from < 0 ? prev.sections.length : from + 1
-      const next = { ...prev, sections: prev.sections.toSpliced(at, 0, copy) }
-      return selectPart(next, { section: copy.id, part: parts[Math.min(partIndex, parts.length - 1)].id })
-    })
-    focusRequest.current = { id: elId(copy.id, 'name'), select: true }
-    setStatus(`Added a copy of ${sectionLabel(section, index)}.`)
+    focusRequest.current = { id: elId(section.id, 'cell'), select: false }
   }
 
   function remove(section: Section, index: number) {
@@ -419,7 +387,7 @@ export function ProgramPanel({
                       const delta = moveKey(e)
                       if (delta === 0) return
                       e.preventDefault()
-                      stepSection(index, delta, 'cell')
+                      stepSection(index, delta)
                     }}
                   >
                     <span className="program-panel__cell-line program-panel__cell-line--head" aria-hidden="true">
@@ -567,35 +535,6 @@ export function ProgramPanel({
                   />
                 </span>
                 <span className="program-panel__actions">
-                  <IconButton
-                    id={elId(shown.id, 'up')}
-                    size="sm"
-                    label={`Move ${editLabel} earlier`}
-                    icon={<ArrowUpIcon size={16} />}
-                    disabled={editIndex === 0}
-                    onClick={() => stepSection(editIndex, -1, 'buttons')}
-                  />
-                  <IconButton
-                    id={elId(shown.id, 'down')}
-                    size="sm"
-                    label={`Move ${editLabel} later`}
-                    icon={<ArrowDownIcon size={16} />}
-                    disabled={editIndex === sections.length - 1}
-                    onClick={() => stepSection(editIndex, 1, 'buttons')}
-                  />
-                  <IconButton
-                    size="sm"
-                    label={`Duplicate ${editLabel}`}
-                    icon={<CopyIcon size={16} />}
-                    disabled={!canAdd}
-                    onClick={() => duplicate(shown, editIndex)}
-                  />
-                  <IconButton
-                    size="sm"
-                    label={`Delete ${editLabel}`}
-                    icon={<TrashIcon size={16} />}
-                    onClick={() => remove(shown, editIndex)}
-                  />
                   <Button
                     size="sm"
                     variant="secondary"

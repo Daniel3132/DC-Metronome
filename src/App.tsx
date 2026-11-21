@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { BeatFlash } from './components/BeatFlash/BeatFlash'
 import { BeatGrid } from './components/BeatGrid/BeatGrid'
 import { MainPanel } from './components/MainPanel/MainPanel'
@@ -12,13 +12,14 @@ import { TapTempoButton, type TapTempoHandle } from './components/TapTempoButton
 import { TempoControl } from './components/TempoControl/TempoControl'
 import { Transport } from './components/Transport/Transport'
 import { VoicePanel } from './components/VoicePanel/VoicePanel'
-import { FlashIcon, MetronomeIcon } from './components/icons/icons'
-import { Toggle } from './components/ui/ui'
+import { CheckIcon, FlashIcon, MetronomeIcon, SaveIcon, XIcon } from './components/icons/icons'
+import { Button, IconButton, Toggle } from './components/ui/ui'
 import type { PanelProps } from './components/panelTypes'
 import { clampTempoPercent, findPart, practiceAt, selectPart, selectSection, withBpm } from './core/settings'
 import type { PartRef, Rhythm, Settings } from './core/types'
 import { useKeyboardShortcuts } from './state/useKeyboardShortcuts'
 import { useMetronome } from './state/useMetronome'
+import { presetActions, UNDO_MS, usePresets } from './state/usePresets'
 import { useSettings } from './state/useSettings'
 import './App.css'
 
@@ -107,6 +108,9 @@ export default function App() {
   const metronome = useMetronome(settings)
   const { playback } = metronome
   const [tab, setTab] = useState<TabId>(MAIN_TAB)
+  const { activeName, deleted } = usePresets()
+  // Briefly true after the header save button overwrote the active preset (its icon turns into a check).
+  const [presetSaved, setPresetSaved] = useState(false)
   const tapTempo = useRef<TapTempoHandle>(null)
   const tabList = useRef<HTMLDivElement>(null)
   const idBase = useId()
@@ -137,6 +141,16 @@ export default function App() {
   const playingSectionName = settings.program.enabled && playingSection ? playingSection.name : null
 
   const setBpm = (bpm: number) => update((prev) => withBpm(prev, bpm))
+
+  function saveActivePreset() {
+    if (presetActions.saveActive(settings)) setPresetSaved(true)
+  }
+
+  useEffect(() => {
+    if (!presetSaved) return
+    const timer = window.setTimeout(() => setPresetSaved(false), 1500)
+    return () => window.clearTimeout(timer)
+  }, [presetSaved])
 
   useKeyboardShortcuts({
     togglePlay: () => void metronome.toggle(),
@@ -269,40 +283,65 @@ export default function App() {
             sectionName={playingSectionName}
             programEnabled={settings.program.enabled}
             gap={settings.gap}
-            practice={settings.practice}
           />
         </section>
 
         <section className="app__settings" aria-label="Settings">
-          <div ref={tabList} className="app__tabs" role="tablist" aria-label="Settings">
-            {TABS.map((t, index) => {
-              const selected = t.id === tab
-              const indicator = tabIndicator(t.id, settings)
-              return (
+          <div className="app__tabbar">
+            <div ref={tabList} className="app__tabs" role="tablist" aria-label="Settings">
+              {TABS.map((t, index) => {
+                const selected = t.id === tab
+                const indicator = tabIndicator(t.id, settings)
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="tab"
+                    id={tabId(t.id)}
+                    className="app__tab"
+                    aria-selected={selected}
+                    aria-controls={panelId(t.id)}
+                    aria-keyshortcuts={String(index + 1)}
+                    title={`${t.label} (${index + 1})`}
+                    tabIndex={selected ? 0 : -1}
+                    onClick={() => setTab(t.id)}
+                    onKeyDown={(e) => onTabKeyDown(e, index)}
+                  >
+                    {t.label}
+                    {/* The dot always takes its space, so switching a feature on never resizes the tab bar. */}
+                    <span
+                      className={`app__tab-dot${indicator !== null ? ` app__tab-dot--${indicator}` : ' app__tab-dot--off'}`}
+                      aria-hidden="true"
+                    />
+                    {indicator !== null && <span className="sr-only">({indicator})</span>}
+                  </button>
+                )
+              })}
+            </div>
+            {activeName !== null && (
+              <div className="app__preset">
                 <button
-                  key={t.id}
                   type="button"
-                  role="tab"
-                  id={tabId(t.id)}
-                  className="app__tab"
-                  aria-selected={selected}
-                  aria-controls={panelId(t.id)}
-                  aria-keyshortcuts={String(index + 1)}
-                  title={`${t.label} (${index + 1})`}
-                  tabIndex={selected ? 0 : -1}
-                  onClick={() => setTab(t.id)}
-                  onKeyDown={(e) => onTabKeyDown(e, index)}
+                  className="app__active-preset"
+                  title={`Active preset: ${activeName}. Open the presets`}
+                  onClick={() => setTab('presets')}
                 >
-                  {t.label}
-                  {/* The dot always takes its space, so switching a feature on never resizes the tab bar. */}
-                  <span
-                    className={`app__tab-dot${indicator !== null ? ` app__tab-dot--${indicator}` : ' app__tab-dot--off'}`}
-                    aria-hidden="true"
-                  />
-                  {indicator !== null && <span className="sr-only">({indicator})</span>}
+                  <span className="app__active-preset-label">Preset</span>
+                  <span className="app__active-preset-name">{activeName}</span>
                 </button>
-              )
-            })}
+                <IconButton
+                  size="sm"
+                  variant="ghost"
+                  className={`app__preset-save${presetSaved ? ' is-saved' : ''}`}
+                  label={presetSaved ? `Saved to ${activeName}` : `Save the current setup to ${activeName}`}
+                  icon={presetSaved ? <CheckIcon size={16} /> : <SaveIcon size={16} />}
+                  onClick={saveActivePreset}
+                />
+                <span className="sr-only" role="status">
+                  {presetSaved ? `Saved to ${activeName}.` : ''}
+                </span>
+              </div>
+            )}
           </div>
           {TABS.map((t) => (
             <div
@@ -319,6 +358,20 @@ export default function App() {
           ))}
         </section>
       </main>
+
+      {deleted !== null && (
+        // Keyed per deletion, so the countdown line restarts when another preset is deleted.
+        <div key={deleted.preset.id} className="app__undo" role="status" style={{ '--undo-ms': `${UNDO_MS}ms` } as CSSProperties}>
+          <span className="app__undo-text">
+            Deleted <strong>{deleted.preset.name}</strong>
+          </span>
+          <Button size="sm" variant="secondary" onClick={() => presetActions.undoRemove()}>
+            Undo
+          </Button>
+          <IconButton size="sm" variant="ghost" label="Dismiss" icon={<XIcon size={16} />} onClick={() => presetActions.dismissUndo()} />
+          <span className="app__undo-countdown" aria-hidden="true" />
+        </div>
+      )}
     </div>
   )
 }

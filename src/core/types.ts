@@ -241,7 +241,8 @@ export interface Settings {
 
 /**
  * What the engine and sequencer get: the settings with the program expanded into single-meter steps (see
- * playbackSettings). `activeSection` is the step that loops outside program mode.
+ * playbackSettings). `activeSection` is the step that loops outside program mode, and the step playback starts at in
+ * program mode.
  */
 export interface PlaybackSettings extends Omit<Settings, 'sections' | 'selected' | 'current'> {
   sections: PlaySection[]

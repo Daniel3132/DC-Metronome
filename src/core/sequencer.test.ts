@@ -808,9 +808,12 @@ describe('program mode', () => {
     expect(seq.peekTime(looping)).toBeNull()
   })
 
-  it('starts at section 0 even when another section is active', () => {
+  it('starts at the active section (the selected one), then carries on in order', () => {
     const settings = { ...looping, activeSection: 2 }
-    expect(take(createSequencer(settings, 0), settings, 1)[0].sectionIndex).toBe(0)
+    const starts = barStarts(createSequencer(settings, 0), settings, 4)
+    expect(starts[0].sectionIndex).toBe(2)
+    expect(starts[0].sectionBar).toBe(0)
+    expect(starts.at(-1)?.sectionIndex).not.toBe(2)
   })
 
   it('uses the section tempo only in program mode, scaled by the percentage', () => {

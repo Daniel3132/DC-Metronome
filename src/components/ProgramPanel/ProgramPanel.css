@@ -332,17 +332,13 @@
   background: transparent;
 }
 
-/* Takes a full line when the preview leaves no room, so the five actions never split at 360 px. */
+/* The Done button, at the end of the row. */
 .program-panel__actions {
   display: flex;
   flex: 1 0 auto;
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-1);
-}
-
-.program-panel__actions > :first-child {
-  margin-inline-end: auto;
 }
 
 @media (forced-colors: active) {

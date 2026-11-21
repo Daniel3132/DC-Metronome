@@ -395,7 +395,7 @@ describe('sanitizeSettings', () => {
     expect(settings.practice.targetBpm).toBe(MAX_BPM)
     expect(settings.practice.stepBpm).toBe(1)
     expect(settings.practice.everyBars).toBe(MAX_PRACTICE_EVERY_BARS)
-    expect(settings.mixer).toEqual({ master: 1, accent: 0, medium: 1, beat: 0.33, sub: 0.6, voice: 1, muted: false })
+    expect(settings.mixer).toEqual({ master: 1.25, accent: 0, medium: 1, beat: 0.33, sub: 0.6, voice: 1, muted: false })
 
     const high = sanitizeSettings({
       bpm: 99.6,
@@ -734,6 +734,18 @@ describe('playbackSettings', () => {
     expect(solo.sections).toEqual([{ ...settings.current, name: '', tempo: null }])
     expect(solo.activeSection).toBe(0)
     expect(solo.program.enabled).toBe(false)
+  })
+
+  it('starts program mode at the selected section, at its first step', () => {
+    const settings = mixed()
+    expect(playbackSettings(settings).activeSection).toBe(0)
+    const out = settings.sections[1]
+    const selected = { ...settings, selected: { section: out.id, part: out.parts[0].id } }
+    // Mixed expands into 4 steps (2 parts × 2 repeats), so Out is step 4.
+    expect(playbackSettings(selected).activeSection).toBe(4)
+    const mixedLast = settings.sections[0]
+    const inMixed = { ...settings, selected: { section: mixedLast.id, part: mixedLast.parts[1].id } }
+    expect(playbackSettings(inMixed).activeSection).toBe(0)
   })
 
   it('expands every part of every repetition in program mode, with its origin', () => {

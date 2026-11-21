@@ -1,4 +1,4 @@
-import { SOUND_ROLES } from '../../core/constants'
+import { MAX_MASTER_VOLUME, SOUND_ROLES } from '../../core/constants'
 import { createDefaultSettings } from '../../core/settings'
 import type { MixerSettings, SoundRole } from '../../core/types'
 import { SpeakerIcon, VolumeIcon, VolumeMuteIcon } from '../icons/icons'
@@ -63,6 +63,7 @@ export function MixerPanel({ settings, onChange, metronome }: PanelProps) {
             className="mixer-panel__master"
             label="Master"
             value={mixer.master}
+            max={MAX_MASTER_VOLUME}
             onChange={(value) => setGain('master', value)}
             dimmed={mixer.muted}
             beside={<LevelMeter active={playing} getLevel={metronome.getLevel} />}

@@ -1,6 +1,5 @@
-import type { CSSProperties, ReactNode } from 'react'
-import type { GapSettings, PracticeSettings, PulseEvent } from '../../core/types'
-import { TrendDownIcon, TrendUpIcon } from '../icons/icons'
+import type { ReactNode } from 'react'
+import type { GapSettings, PulseEvent } from '../../core/types'
 import './StatusBar.css'
 
 interface StatusBarProps {
@@ -11,7 +10,6 @@ interface StatusBarProps {
   sectionName: string | null
   programEnabled: boolean
   gap: GapSettings
-  practice: PracticeSettings
 }
 
 const DASH = '–'
@@ -33,16 +31,11 @@ function Item({ label, children, wide = false }: { label: string; children: Reac
   )
 }
 
-/** Where playback is. Items for program, speed trainer and gap trainer appear whenever those features are on. */
-export function StatusBar({ pulse, startTime, sectionName, programEnabled, gap, practice }: StatusBarProps) {
+/** Where playback is. Items for program and gap trainer appear whenever those features are on (the speed trainer's
+ * progress is in its own card in the Quick tab). */
+export function StatusBar({ pulse, startTime, sectionName, programEnabled, gap }: StatusBarProps) {
   const playing = pulse !== null
   const elapsed = pulse !== null && startTime !== null ? pulse.time - startTime : 0
-
-  const run = pulse?.practice ?? null
-  const practiceBpm = run?.bpm ?? practice.startBpm
-  const span = practice.targetBpm - practice.startBpm
-  const progress = span === 0 ? 1 : Math.min(1, Math.max(0, (practiceBpm - practice.startBpm) / span))
-  const rising = run ? run.direction >= 0 : span >= 0
 
   return (
     <dl className={`status-bar${playing ? ' is-playing' : ''}`} aria-label="Playback status">
@@ -72,21 +65,6 @@ export function StatusBar({ pulse, startTime, sectionName, programEnabled, gap, 
           ) : (
             DASH
           )}
-        </Item>
-      )}
-
-      {practice.enabled && (
-        <Item label="Speed trainer" wide>
-          <span className="status-bar__practice">
-            {rising ? <TrendUpIcon size={14} /> : <TrendDownIcon size={14} />}
-            {practiceBpm} BPM
-            <span className="status-bar__muted">
-              {run ? ` · bar ${run.barsAtTempo + 1}/${run.everyBars}` : ` → ${practice.targetBpm}`}
-            </span>
-          </span>
-          <span className="status-bar__progress" aria-hidden="true">
-            <span className="status-bar__progress-fill" style={{ '--progress': progress } as CSSProperties} />
-          </span>
         </Item>
       )}
 

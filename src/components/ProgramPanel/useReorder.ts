@@ -41,7 +41,12 @@ interface Pending {
  * long press (a quick swipe keeps scrolling). The dragged item follows the pointer and a marker shows where it lands;
  * dropping calls `onMove(from, to)` with the item's new index. Escape cancels. Keyboard users get separate buttons.
  */
-export function useReorder(count: number, onMove: (from: number, to: number) => void): Reorder {
+export function useReorder(
+  count: number,
+  onMove: (from: number, to: number) => void,
+  /** 'x' for rows or wrapping grids (drop before/after by the item's left/right half), 'y' for a vertical list. */
+  axis: 'x' | 'y' = 'x',
+): Reorder {
   const [state, setState] = useState<ReorderState>({ from: null, insertAt: null })
   const pending = useRef<Pending | null>(null)
   const dragging = useRef<{ el: HTMLElement; rects: DOMRect[]; from: number; insertAt: number | null } | null>(null)
@@ -98,7 +103,8 @@ export function useReorder(count: number, onMove: (from: number, to: number) => 
     const over = drag.rects.findIndex((r) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)
     if (over < 0) return
     const rect = drag.rects[over]
-    const insertAt = x < rect.left + rect.width / 2 ? over : over + 1
+    const before = axis === 'x' ? x < rect.left + rect.width / 2 : y < rect.top + rect.height / 2
+    const insertAt = before ? over : over + 1
     // Dropping right before or after itself changes nothing: show no marker.
     const next = insertAt === drag.from || insertAt === drag.from + 1 ? null : insertAt
     if (next !== drag.insertAt) {
@@ -109,6 +115,8 @@ export function useReorder(count: number, onMove: (from: number, to: number) => 
 
   function onPointerDown(e: ReactPointerEvent<HTMLElement>, index: number) {
     if (e.button !== 0 || pending.current || countRef.current < 2) return
+    // Pressing in a text field selects text; it never starts a drag.
+    if (e.target instanceof Element && e.target.closest('input, textarea, select')) return
     const touch = e.pointerType === 'touch'
     const press: Pending = {
       index,
