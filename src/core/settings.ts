@@ -6,12 +6,13 @@ import {
   MAX_BEATS_PER_BAR,
   MAX_BPM,
   MAX_GAP_BARS,
+  MAX_MASTER_VOLUME,
   MAX_PRACTICE_EVERY_BARS,
   MAX_PRACTICE_STEP,
+  MAX_SECTIONS,
   MAX_SECTION_BARS,
   MAX_SECTION_PARTS,
   MAX_SECTION_REPEATS,
-  MAX_SECTIONS,
   MAX_TEMPO_PERCENT,
   MIN_BPM,
   MIN_TEMPO_PERCENT,
@@ -271,7 +272,7 @@ function sanitizeSection(raw: Fields, usedIds: Set<string>): Section {
 
 function sanitizeMixer(raw: Fields, d: MixerSettings): MixerSettings {
   return {
-    master: numberIn(raw.master, d.master, 0, 1),
+    master: numberIn(raw.master, d.master, 0, MAX_MASTER_VOLUME),
     accent: numberIn(raw.accent, d.accent, 0, 1),
     medium: numberIn(raw.medium, d.medium, 0, 1),
     beat: numberIn(raw.beat, d.beat, 0, 1),
@@ -508,16 +509,20 @@ function programSteps(sections: Section[]): PlaySection[] {
 
 /**
  * What the engine plays. The sequencer only knows single-meter steps, so sections are expanded into one step per part
- * and repetition (each with its origin). In program mode that is the whole program; outside it the selected section
+ * and repetition (each with its origin). In program mode that is the whole program, starting from the selected section
+ * when there is one (activeSection); outside it the selected section
  * loops at the main tempo (one pass, advanced like a looping program), or the free rhythm loops when none is selected.
  */
 export function playbackSettings(settings: Settings): PlaybackSettings {
   const { sections, selected, current, ...rest } = settings
+  const found = findPart(settings, selected)
   // An empty program has nothing to play: the free rhythm plays instead, as outside program mode.
   if (settings.program.enabled && sections.length > 0) {
-    return { ...rest, sections: programSteps(sections), activeSection: 0 }
+    // Playback starts at the beginning of the selected section (its first part, first repeat), else at the top.
+    const steps = programSteps(sections)
+    const start = found ? steps.findIndex((step) => step.origin?.section === found.sectionIndex) : 0
+    return { ...rest, sections: steps, activeSection: Math.max(0, start) }
   }
-  const found = findPart(settings, selected)
   if (found) {
     return {
       ...rest,

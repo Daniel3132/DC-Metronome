@@ -1,11 +1,11 @@
-import { useEffect, useId, useState, type FormEvent, type ReactNode } from 'react'
-import { STORAGE_KEYS } from '../../core/constants'
+import { useId, useState, type FormEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { makeId } from '../../core/settings'
-import { FACTORY_PRESETS, type FactoryPreset } from '../../state/factoryPresets'
-import { applyFactoryPreset, applyPreset, describeFactoryPreset, describeSettings, suggestedName } from '../../state/presetSummary'
-import { loadPresets, savePresets, type Preset } from '../../state/storage'
+import { applyPreset, describeSettings, suggestedName } from '../../state/presetSummary'
+import type { Preset } from '../../state/storage'
+import { presetActions, usePresets } from '../../state/usePresets'
+import { useReorder, type Reorder } from '../ProgramPanel/useReorder'
 import type { PanelProps } from '../panelTypes'
-import { SaveIcon } from '../icons/icons'
+import { GripIcon, SaveIcon, XIcon } from '../icons/icons'
 import { Button, Panel } from '../ui/ui'
 import './QuickPresets.css'
 
@@ -13,16 +13,34 @@ const NAME_MAX_LENGTH = 60
 
 /**
  * Presets at a glance in the Quick tab: one tap loads a saved preset (with its program), and the current setup can be
- * saved under a name. Tapping the highlighted preset again unselects it (the settings stay as they are). Renaming,
- * deleting, import and export stay in the Presets tab.
+ * saved under a name. Tapping the highlighted preset again unselects it (the settings stay as they are). The x in a
+ * card's corner deletes it; dragging a card reorders them. Renaming, import
+ * and export stay in the Presets tab.
  */
 interface QuickPresetsProps extends Pick<PanelProps, 'settings' | 'onChange'> {
   /** Replaces the "Presets" heading (the Quick tab puts its Program / Presets switch there). */
   title?: ReactNode
-  /** Minimized: the header alone. Owned by the Quick tab, so Program and Presets share it. */
+  /** Minimized: the header alone. Owned by the Quick tab. */
   collapsed?: boolean
   /** Rendered at the end of the header (the minimize button). */
   collapseButton?: ReactNode
+}
+
+/** Swallows the click that ends a drag, so dropping a card neither loads nor deletes it. */
+function swallowDropClick(drag: Reorder) {
+  return (e: MouseEvent) => {
+    if (!drag.consumeClick()) return
+    e.preventDefault()
+    e.stopPropagation()
+  }
+}
+
+/** Alt+arrow on a focused card moves it: -1 earlier, +1 later, 0 not a move key. */
+function moveKey(e: KeyboardEvent): -1 | 0 | 1 {
+  if (!e.altKey) return 0
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') return -1
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') return 1
+  return 0
 }
 
 export function QuickPresets({
@@ -33,65 +51,97 @@ export function QuickPresets({
   collapseButton,
 }: QuickPresetsProps) {
   const uid = useId()
-  const [presets, setPresets] = useState<Preset[]>(loadPresets)
+  const { presets, active, activeName } = usePresets()
   const [name, setName] = useState('')
-  const [loadedId, setLoadedId] = useState<string | null>(null)
   const [status, setStatus] = useState('')
-
-  // Another tab saved presets: show them here too.
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEYS.presets) setPresets(loadPresets())
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [])
+  const savedDrag = useReorder(presets.length, presetActions.move)
 
   const placeholder = suggestedName(settings)
 
   function save(e: FormEvent) {
     e.preventDefault()
     const presetName = (name.trim() || placeholder).slice(0, NAME_MAX_LENGTH)
-    const preset: Preset = { id: makeId(), name: presetName, settings, createdAt: Date.now() }
-    // Re-read first, so a preset saved in the Presets tab or another window is not overwritten.
-    const next = [preset, ...loadPresets()]
-    setPresets(next)
-    savePresets(next)
+    presetActions.add({ id: makeId(), name: presetName, settings, createdAt: Date.now() })
     setName('')
-    setLoadedId(preset.id)
     setStatus(`Saved "${presetName}".`)
+  }
+
+  /** Writes the current setup into the active preset (Save as makes a new one instead). */
+  function saveChanges() {
+    if (activeName === null || !presetActions.saveActive(settings)) return
+    setStatus(`Saved the changes to "${activeName}".`)
   }
 
   function load(preset: Preset) {
     if (unselect(preset)) return
     onChange((prev) => applyPreset(prev, preset.settings))
-    setLoadedId(preset.id)
-    setStatus(`Loaded "${preset.name}".`)
-  }
-
-  function loadFactory(preset: FactoryPreset) {
-    if (unselect(preset)) return
-    onChange((prev) => applyFactoryPreset(prev, preset))
-    setLoadedId(preset.id)
+    presetActions.setActive(preset.id)
     setStatus(`Loaded "${preset.name}".`)
   }
 
   /** A tap on the highlighted preset unselects it instead of loading it again. */
-  function unselect(preset: { id: string; name: string }): boolean {
-    if (preset.id !== loadedId) return false
-    setLoadedId(null)
+  function unselect(preset: Preset): boolean {
+    if (active !== preset.id) return false
+    presetActions.setActive(null)
     setStatus(`Unselected "${preset.name}".`)
     return true
   }
 
-  function cardProps(preset: { id: string; name: string }, description?: string) {
-    const loaded = preset.id === loadedId
-    return {
-      type: 'button' as const,
-      className: `quick-presets__card${loaded ? ' is-loaded' : ''}`,
-      'aria-pressed': loaded,
-      title: loaded ? `Unselect ${preset.name}` : description ? `Load ${preset.name}: ${description}` : `Load ${preset.name}`,
+  /** Deletes at once: the undo bar brings it back for a few seconds. */
+  function remove(preset: Preset) {
+    presetActions.remove(preset.id)
+    setStatus(`Deleted "${preset.name}".`)
+  }
+
+  function card(preset: Preset, index: number) {
+    const loaded = active === preset.id
+    const count = presets.length
+    const canDrag = count > 1
+    const cardId = `${uid}-${preset.id}`
+    const onKeyDown = (e: KeyboardEvent) => {
+      const to = index + moveKey(e)
+      if (to === index || to < 0 || to >= count) return
+      e.preventDefault()
+      presetActions.move(index, to)
+      // The card is re-inserted at its new place; keep the keyboard on it.
+      requestAnimationFrame(() => document.getElementById(cardId)?.focus())
     }
+    const description = describeSettings(preset.settings)
+    return (
+      <li
+        key={preset.id}
+        className={['quick-presets__item', savedDrag.itemClass(index)].filter(Boolean).join(' ')}
+        {...savedDrag.itemProps(index)}
+      >
+        <button
+          type="button"
+          id={cardId}
+          className={`quick-presets__card${loaded ? ' is-loaded' : ''}`}
+          aria-pressed={loaded}
+          title={
+            loaded
+              ? `Unselect ${preset.name}`
+              : `Load ${preset.name}${canDrag ? ' (drag or Alt+arrow to reorder)' : ''}`
+          }
+          onClick={() => load(preset)}
+          onKeyDown={onKeyDown}
+        >
+          <span className="quick-presets__name">{preset.name}</span>
+          <span className="quick-presets__meta tabular">{description}</span>
+          {canDrag && <GripIcon size={12} className="quick-presets__grip" />}
+        </button>
+        {/* A sibling of the card (a button cannot hold another button), laid over its corner. */}
+        <button
+          type="button"
+          className="quick-presets__delete"
+          aria-label={`Delete ${preset.name}`}
+          title={`Delete ${preset.name}`}
+          onClick={() => remove(preset)}
+        >
+          <XIcon size={12} />
+        </button>
+      </li>
+    )
   }
 
   const saveForm = (
@@ -113,11 +163,24 @@ export function QuickPresets({
       <Button
         size="sm"
         variant="primary"
-        type="submit"
         icon={<SaveIcon size={16} />}
-        title="Save everything you set up (tempo, program, trainers, sounds) as a preset"
+        disabled={activeName === null}
+        title={
+          activeName === null
+            ? 'Load a preset first: Save writes your changes into the active preset'
+            : `Save your changes to "${activeName}"`
+        }
+        onClick={saveChanges}
       >
         Save
+      </Button>
+      <Button
+        size="sm"
+        variant="secondary"
+        type="submit"
+        title="Save everything you set up (tempo, program, trainers, sounds) as a new preset, named as typed"
+      >
+        Save as
       </Button>
     </form>
   )
@@ -138,32 +201,17 @@ export function QuickPresets({
         <>
           {presets.length === 0 ? (
             <p className="quick-presets__empty">
-              No saved presets yet. Save the current setup (top right), or start from one below.
+              No saved presets yet. Save the current setup (top right).
             </p>
           ) : (
-            <ul className="quick-presets__grid" aria-label="Saved presets">
-              {presets.map((preset) => (
-                <li key={preset.id}>
-                  <button {...cardProps(preset)} onClick={() => load(preset)}>
-                    <span className="quick-presets__name">{preset.name}</span>
-                    <span className="quick-presets__meta tabular">{describeSettings(preset.settings)}</span>
-                  </button>
-                </li>
-              ))}
+            <ul
+              className={['quick-presets__grid', savedDrag.from !== null && 'is-sorting'].filter(Boolean).join(' ')}
+              aria-label="Saved presets"
+              onClickCapture={swallowDropClick(savedDrag)}
+            >
+              {presets.map((preset, index) => card(preset, index))}
             </ul>
           )}
-
-          <h3 className="quick-presets__heading">Factory</h3>
-          <ul className="quick-presets__grid" aria-label="Factory presets">
-            {FACTORY_PRESETS.map((preset) => (
-              <li key={preset.id}>
-                <button {...cardProps(preset, preset.description)} onClick={() => loadFactory(preset)}>
-                  <span className="quick-presets__name">{preset.name}</span>
-                  <span className="quick-presets__meta tabular">{describeFactoryPreset(preset)}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
         </>
       )}
       <p role="status" className="sr-only">

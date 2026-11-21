@@ -18,6 +18,8 @@ export const MAX_BEATS_PER_BAR = 16
 export const MAX_SECTION_BARS = 999
 export const MAX_GAP_BARS = 64
 export const MAX_PRACTICE_EVERY_BARS = 64
+/** Master volume can be pushed past 100 % (a boost for quiet speakers), up to this gain. */
+export const MAX_MASTER_VOLUME = 1.25
 export const MAX_PRACTICE_STEP = 50
 export const MAX_SECTIONS = 64
 /** Parts (e.g. a bar of 2/4 then a bar of 4/4) in one section. */
@@ -113,6 +115,8 @@ export function voiceSampleUrl(pack: VoicePackId, word: VoiceWord): string {
 export const STORAGE_KEYS = {
   settings: 'dcmetronome.settings.v1',
   presets: 'dcmetronome.presets.v1',
+  /** The preset loaded last (shown in the tab bar). */
+  activePreset: 'dcmetronome.presets.active.v1',
   /** Program templates from older versions; moved into the presets on first load. */
   templates: 'dcmetronome.templates.v1',
   /** Accent color of the theme picker (a display preference, not part of the settings). */

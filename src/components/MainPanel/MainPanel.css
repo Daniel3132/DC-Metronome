@@ -1,31 +1,138 @@
 .main-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 0;
   min-width: 0;
+}
+
+/* The blocks (two rows, two cards) stack without gaps; each overlaps the border above, so lines stay 1px. */
+.main-panel > * + * {
+  margin-top: -1px;
+}
+
+/* Program and presets cards sit in a block wrapper: that is what drags. */
+.main-panel__block {
+  position: relative;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.main-panel__block > .ui-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ---- Drag grip (rows and cards) and dragging ---- */
+
+.main-panel__grip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+  cursor: grab;
+  opacity: 0.6;
+  touch-action: none;
+}
+
+@media (hover: hover) {
+  .main-panel__grip:hover {
+    background: var(--surface-2);
+    color: var(--text);
+    opacity: 1;
+  }
+}
+
+.main-panel__block.is-dragging {
+  z-index: 10;
+  box-shadow: var(--shadow-md);
+  cursor: grabbing;
+}
+
+.main-panel__block.is-dragging > .ui-panel {
+  border-color: var(--accent);
+}
+
+/* Where the dragged block lands: a line along the top or bottom edge of the block it is over. */
+.main-panel__block.is-drop-before::before,
+.main-panel__block.is-drop-after::after {
+  position: absolute;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  height: 3px;
+  background: var(--accent);
+  content: '';
+  pointer-events: none;
+}
+
+.main-panel__block.is-drop-before::before {
+  top: 0;
+}
+
+.main-panel__block.is-drop-after::after {
+  bottom: 0;
 }
 
 /* ---- The lower card (Program or Presets): compact, every row as short as it can be ---- */
 
-.main-panel .program-panel,
-.main-panel .quick-presets {
-  --control-md: 30px;
-  --control-sm: 28px;
-  gap: 6px;
-  padding: 6px var(--space-3);
+/*
+ * .ui-panel: outranks the tab panels' card padding in App.css, which loads later. Square and flush under the quick
+ * controls (overlapping their bottom line), like their rows; cards in split view overlap each other the same way.
+ */
+.main-panel .ui-panel.program-panel,
+.main-panel .ui-panel.quick-presets {
+  --control-md: 28px;
+  --control-sm: 24px;
+  gap: var(--space-1);
+  padding: 5px 4px 5px var(--space-2);
+  border-radius: 0;
+  box-shadow: none;
 }
 
-.main-panel .program-panel .ui-panel-body,
-.main-panel .quick-presets .ui-panel-body {
-  gap: 6px;
+/* One text size for the whole tab (12px), as in the quick controls; phones keep 16px in typed fields (iOS zoom). */
+.main-panel .program-panel .ui-segmented-item,
+.main-panel .quick-presets .ui-segmented-item,
+.main-panel .program-panel .ui-toggle,
+.main-panel .program-panel .ui-button,
+.main-panel .quick-presets .ui-button,
+.main-panel .quick-presets__name {
+  font-size: var(--fs-xs);
 }
 
-/* Header: the Program / Presets switch, the summary right after it on the same line, controls at the end. */
+.main-panel .program-panel .ui-toggle {
+  min-height: var(--control-sm);
+}
+
+@media (pointer: fine) {
+  .main-panel .program-panel .ui-stepper-input,
+  .main-panel .program-panel .ui-select-input,
+  .main-panel .program-panel__name,
+  .main-panel .program-quick__input,
+  .main-panel .quick-presets__input {
+    font-size: var(--fs-xs);
+  }
+}
+
+.main-panel .program-panel .ui-panel-body.ui-panel-body,
+.main-panel .quick-presets .ui-panel-body.ui-panel-body {
+  gap: var(--space-1);
+}
+
+/* Header: the title, the summary right after it on the same line, controls at the end. */
 .main-panel .program-panel .ui-panel-header,
 .main-panel .quick-presets .ui-panel-header {
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px var(--space-2);
+  gap: var(--space-1) var(--space-2);
   min-height: var(--control-sm);
 }
 
@@ -39,14 +146,15 @@
   min-width: 0;
 }
 
-.main-panel .ui-panel-title:has(.main-panel__views) {
-  display: flex;
+/* Card titles read like the quick controls' cell labels. */
+.main-panel .program-panel .ui-panel-title,
+.main-panel .quick-presets .ui-panel-title {
   flex: none;
-  font-size: inherit;
-}
-
-.main-panel__views .ui-segmented-item {
-  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .main-panel .program-panel .ui-panel-description,
@@ -84,7 +192,7 @@
 }
 
 .program-panel__loop .ui-toggle-label {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
 }
 
 .program-panel__warn {
@@ -115,10 +223,8 @@
   width: 0;
 }
 
-.main-panel .program-panel .ui-select-input,
-.main-panel .program-panel .ui-stepper-input,
 .main-panel .program-panel .ui-toggle-label {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
 }
 
 /* Matrix: small two-line cells (index, meter, bars, tempo / accents, name). */
@@ -128,8 +234,8 @@
 }
 
 .main-panel .program-panel__cell {
-  gap: 4px;
-  padding: 6px var(--space-2) 8px;
+  gap: 2px;
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
 }
 
@@ -190,7 +296,7 @@
 }
 
 .main-panel .program-panel__cell-meter {
-  font-size: var(--fs-xl);
+  font-size: var(--fs-lg);
   letter-spacing: 0;
 }
 
@@ -240,7 +346,7 @@
 
 /* Editor of the selected section: one row (wraps on narrow screens). */
 .main-panel .program-panel__section {
-  padding: 6px var(--space-2);
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
 }
 
@@ -262,7 +368,6 @@
   flex: 0 1 10rem;
   width: auto;
   min-height: var(--control-sm);
-  font-size: var(--fs-sm);
 }
 
 .main-panel .program-panel__editor .ui-stepper {
@@ -282,10 +387,6 @@
   margin-inline-start: auto;
 }
 
-.main-panel .program-panel__actions > :first-child {
-  margin-inline-end: 0;
-}
-
 .main-panel .program-panel__actions .ui-button {
   margin-inline-start: var(--space-1);
 }
@@ -293,13 +394,13 @@
 /* ---- Presets body ---- */
 
 .main-panel .quick-presets__save {
-  flex: 0 1 18rem;
+  flex: 0 1 24rem;
   min-width: 0;
 }
 
 /*
- * Desktop: the page never scrolls. The quick controls keep their height and the lower card takes what is left;
- * when it holds more than fits, only its contents scroll.
+ * Desktop: the page never scrolls. The rows keep their height, the program card takes what it needs and the presets
+ * card stretches to the bottom of the tab; when a card holds more than fits, only its contents scroll.
  */
 @media (min-width: 900px) {
   .main-panel {
@@ -311,11 +412,20 @@
     flex: none;
   }
 
-  /* Shrinks (and scrolls inside) when space runs out, but never stretches into an empty card. */
-  .main-panel .program-panel:not(.is-collapsed),
-  .main-panel .quick-presets:not(.is-collapsed) {
+  /* An open card shrinks (and scrolls inside) when space runs out. */
+  .main-panel__block:has(> .ui-panel:not(.is-collapsed)) {
     flex: 0 1 auto;
     min-height: 7rem;
+  }
+
+  /* The open presets card shows two rows of presets; more scroll inside it. */
+  .main-panel .quick-presets .ui-panel-body {
+    max-height: calc(2 * var(--preset-card-h) + var(--space-2) + 4px);
+  }
+
+  /* Short of room, the presets card gives way first (down to its minimum); the program keeps its height until then. */
+  .main-panel__block--presets:has(> .ui-panel:not(.is-collapsed)) {
+    flex-shrink: 1000;
   }
 
   .main-panel .program-panel .ui-panel-header,
@@ -330,9 +440,10 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
-    /* Room for focus rings next to the scrollbar. */
-    margin-right: calc(-1 * var(--space-2));
-    padding: 2px var(--space-2) 2px 2px;
+    /* Room for focus rings next to the scrollbar, taken from the card's right padding (never past the card, or the
+       tab gets a horizontal scrollbar). */
+    margin-right: -4px;
+    padding: 2px 4px 2px 2px;
   }
 
   .main-panel .program-panel .ui-panel-body > *,
@@ -348,10 +459,73 @@
 
 /* The section editor runs as compact as the rest of the card. */
 .main-panel .program-panel__group {
-  gap: 6px;
+  gap: var(--space-1);
 }
 
 .main-panel .program-panel__parts-row .ui-stepper {
   flex: none;
   gap: 2px;
+}
+
+/*
+ * Phones: the text entry gets a whole row, with its buttons and Clear all on the row below (the preview line under
+ * both). The section editor packs name and repeats on one row, tempo and the actions after it.
+ */
+@media (max-width: 600px) {
+  .program-panel__tools .program-quick,
+  .program-panel__tools .program-quick__row {
+    display: contents;
+  }
+
+  .program-panel__tools {
+    gap: 6px var(--space-1);
+  }
+
+  .program-panel__tools .program-quick__input {
+    flex: 1 1 100%;
+    width: auto;
+  }
+
+  .program-panel__tools > .ui-button {
+    margin-inline-start: auto;
+  }
+
+  .program-panel__tools .program-quick__preview {
+    flex: 1 1 100%;
+    order: 1;
+  }
+
+  .main-panel .program-panel__name {
+    flex: 1 1 6rem;
+    min-width: 0;
+  }
+
+  .main-panel .program-panel__tempo {
+    flex: 1 1 auto;
+  }
+
+  .main-panel .program-panel__actions {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+
+  .main-panel .program-panel__parts-row {
+    flex-wrap: wrap;
+  }
+}
+
+/*
+ * The stack of blocks gets the stage's rounded corners on its outside: the top of the first block and the bottom of
+ * the last one (whichever blocks those are after dragging). After the card rules above, so it wins over their 0.
+ */
+.main-panel > :first-child,
+.main-panel > :first-child > .ui-panel {
+  border-top-left-radius: var(--radius-sm);
+  border-top-right-radius: var(--radius-sm);
+}
+
+.main-panel > :last-child,
+.main-panel > :last-child > .ui-panel {
+  border-bottom-right-radius: var(--radius-sm);
+  border-bottom-left-radius: var(--radius-sm);
 }

@@ -20,7 +20,7 @@
     position: relative;
     height: 100dvh;
     overflow: hidden;
-    padding: var(--space-1) var(--space-6) var(--space-4);
+    padding: 2px var(--space-2) var(--space-2);
   }
 }
 
@@ -98,17 +98,17 @@
   .app__main {
     flex: 1 1 auto;
     min-height: 0;
-    grid-template-columns: minmax(300px, 420px) minmax(0, 1fr);
+    grid-template-columns: minmax(300px, 444px) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
     align-items: stretch;
-    gap: var(--space-5);
+    gap: var(--space-3);
   }
 }
 
 /* Smaller laptops: a narrower stage leaves the settings room for the quick controls. */
 @media (min-width: 900px) and (max-width: 1279px) {
   .app__main {
-    grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
+    grid-template-columns: minmax(300px, 364px) minmax(0, 1fr);
   }
 }
 
@@ -121,8 +121,8 @@
   padding: var(--space-4);
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
+  /* Slightly rounded: almost as square as the blocks of the Quick tab beside it. */
+  border-radius: var(--radius-sm);
 }
 
 @media (min-width: 640px) {
@@ -137,14 +137,19 @@
     --fs-display: clamp(3.25rem, 11vh, 7rem);
     gap: var(--space-3);
     min-height: 0;
+    /* Only ever scrolls up and down (a pixel of overflow sideways used to bring a tiny horizontal scrollbar). */
+    overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
   }
 
+  .app__stage .tempo-control__layout {
+    gap: var(--space-2);
+  }
+
   /* Three zones: tempo and transport on top, status at the bottom, the beat pads filling the height between. */
   .app__stage .tempo-control {
-    gap: var(--space-2);
     padding-bottom: var(--space-3);
     border-bottom: 1px solid var(--border);
   }
@@ -181,7 +186,8 @@
 .app__settings {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  /* The tab content starts right under the tab bar. */
+  gap: 0;
   min-width: 0;
 }
 
@@ -191,20 +197,101 @@
   }
 }
 
-.app__tabs {
+/* The tabs, and the active preset at the far right. */
+.app__tabbar {
   position: sticky;
   top: 0;
   z-index: 10;
   display: flex;
-  gap: var(--space-1);
-  /* Bleed to the screen edges on phones so the bar scrolls under the gutter instead of clipping. */
+  align-items: center;
+  gap: var(--space-2);
+  /* Bleed to the screen edges on phones so the tabs scroll under the gutter instead of clipping. */
   margin: 0 calc(-1 * var(--space-4));
-  padding: var(--space-2) var(--space-4);
-  overflow-x: auto;
+  padding-right: var(--space-4);
   background: var(--bg);
   border-bottom: 1px solid var(--border);
+}
+
+.app__tabs {
+  display: flex;
+  flex: 1 1 auto;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-1) var(--space-4);
+  overflow-x: auto;
   scroll-padding-inline: var(--space-4);
   scrollbar-width: none;
+}
+
+/* Only the tabs scroll; the active preset keeps its place at the end. */
+.app__tabbar:has(.app__active-preset) .app__tabs {
+  padding-right: var(--space-1);
+}
+
+/* The active preset and its save button. Never squeezed by the tabs (they scroll); a long name truncates instead. */
+.app__preset {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  max-width: min(55%, 18rem);
+  min-width: 0;
+}
+
+.ui-button.app__preset-save {
+  flex: none;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  color: var(--accent-text);
+}
+
+.ui-button.app__preset-save.is-saved {
+  color: var(--success);
+}
+
+.app__active-preset {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px var(--space-3);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-pill);
+  color: var(--accent-text);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.app__active-preset-label {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.app__active-preset-name {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--fw-semibold);
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 599px) {
+  .app__active-preset-label {
+    display: none;
+  }
+}
+
+@media (hover: hover) {
+  .app__active-preset:hover {
+    border-color: var(--accent);
+  }
 }
 
 .app__tabs::-webkit-scrollbar {
@@ -212,13 +299,24 @@
 }
 
 @media (min-width: 900px) {
-  .app__tabs {
+  .app__tabbar {
     position: static;
     flex: none;
-    flex-wrap: wrap;
     margin: 0;
-    padding: 0 0 6px;
+    padding: 0 0 2px;
+    /* No divider: the tab content starts right where it was. */
+    border-bottom: 0;
+  }
+
+  .app__tabs,
+  .app__tabbar:has(.app__active-preset) .app__tabs {
+    flex-wrap: wrap;
+    padding: 0;
     overflow-x: visible;
+  }
+
+  .app__active-preset {
+    padding: 2px var(--space-3);
   }
 }
 
@@ -246,7 +344,7 @@
 
 @media (min-width: 900px) {
   .app__tab {
-    min-height: 30px;
+    min-height: 26px;
     padding: 0 var(--space-3);
     font-size: var(--fs-sm);
   }
@@ -287,7 +385,7 @@
 .app__tabpanel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -298,8 +396,8 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
-    /* Room for focus rings and the scrollbar. */
-    padding: 2px var(--space-2) var(--space-2) 2px;
+    /* Room for focus rings and the scrollbar (the right side keeps its gap). */
+    padding: 0 var(--space-2) var(--space-1) 0;
   }
 }
 
@@ -313,7 +411,7 @@
 }
 
 .app__tabpanel .ui-panel {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
 }
 
@@ -343,5 +441,56 @@
 @media (min-width: 900px) {
   .app__tabpanel--main:not([hidden]) {
     padding-right: 2px;
+    /* Ends level with the stage on the left (the presets card stretches to here). */
+    padding-bottom: 0;
+    /* Only up and down, even if something ends up a pixel too wide. */
+    overflow-x: hidden;
+  }
+}
+
+/* Undo bar after a preset is deleted: bottom center, a line running out over the undo time. */
+.app__undo {
+  position: fixed;
+  bottom: var(--space-4);
+  left: 50%;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: calc(100vw - 2 * var(--space-4));
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  overflow: hidden;
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--fs-sm);
+  transform: translateX(-50%);
+}
+
+.app__undo-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app__undo-countdown {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--accent);
+  transform-origin: left;
+  animation: app-undo-countdown var(--undo-ms, 5s) linear forwards;
+}
+
+@keyframes app-undo-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
   }
 }

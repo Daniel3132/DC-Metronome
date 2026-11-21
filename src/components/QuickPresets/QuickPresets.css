@@ -13,7 +13,13 @@
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-size: var(--fs-sm);
+  font-size: max(16px, var(--fs-sm));
+}
+
+@media (pointer: fine) {
+  .quick-presets__input {
+    font-size: var(--fs-xs);
+  }
 }
 
 .quick-presets__input:focus-visible {
@@ -22,12 +28,14 @@
   box-shadow: 0 0 0 1px var(--accent);
 }
 
-/* Never fewer than 3 columns (even on a phone); more when there is room for 11rem cards. */
+/* Never fewer than 3 columns (even on a phone); more when there is room for 6rem cards. */
 .quick-presets__grid {
   --_gap: var(--space-2);
+  /* Every card the same height (name and two lines of summary), so the Quick tab can size the card to two rows. */
+  grid-auto-rows: var(--preset-card-h);
   display: grid;
   /* A card is at most a third of the row, so there are always at least 3 columns. */
-  grid-template-columns: repeat(auto-fill, minmax(min(11rem, calc((100% - 2 * var(--_gap)) / 3)), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(6rem, calc((100% - 2 * var(--_gap)) / 3)), 1fr));
   gap: var(--_gap);
   margin: 0;
   padding: 0;
@@ -35,18 +43,20 @@
 }
 
 .quick-presets__card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 2px;
   width: 100%;
   height: 100%;
-  min-height: 44px;
-  padding: 6px var(--space-2);
+  min-height: 38px;
+  padding: 4px var(--space-2);
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
   text-align: start;
+  touch-action: manipulation;
   transition:
     background-color var(--dur-fast) var(--ease-out),
     border-color var(--dur-fast) var(--ease-out);
@@ -65,6 +75,8 @@
 }
 
 .quick-presets__name {
+  /* Room for the delete button in the corner. */
+  padding-right: 16px;
   overflow: hidden;
   font-size: var(--fs-sm);
   font-weight: var(--fw-semibold);
@@ -82,15 +94,97 @@
   -webkit-line-clamp: 2;
 }
 
-.quick-presets__heading,
 .quick-presets__empty {
   color: var(--text-muted);
   font-size: var(--fs-xs);
 }
 
-.quick-presets__heading {
-  margin-top: var(--space-1);
-  font-weight: var(--fw-bold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+/* ---- Delete (x) in the corner, drag to reorder ---- */
+
+.quick-presets__item {
+  position: relative;
+  /* A long press drags instead of opening the text-selection menu. */
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.quick-presets__delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  opacity: 0.7;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .quick-presets__delete:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+    opacity: 1;
+  }
+}
+
+.quick-presets__grip {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  color: var(--text-muted);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .quick-presets__card:hover .quick-presets__grip {
+    opacity: 0.9;
+  }
+}
+
+.quick-presets__item.is-dragging {
+  z-index: 10;
+}
+
+/* Opaque while it floats over the other cards (the loaded tint is translucent). */
+.is-dragging > .quick-presets__card {
+  background: var(--surface-1);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-md);
+}
+
+.quick-presets__grid.is-sorting,
+.quick-presets__grid.is-sorting button {
+  cursor: grabbing;
+}
+
+/* Where the dragged card lands: a bar in the middle of the grid gap. */
+.quick-presets__item.is-drop-before::before,
+.quick-presets__item.is-drop-after::after {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  content: '';
+  pointer-events: none;
+}
+
+.quick-presets__item.is-drop-before::before {
+  left: calc(-1 * var(--_gap) / 2 - 2px);
+}
+
+.quick-presets__item.is-drop-after::after {
+  right: calc(-1 * var(--_gap) / 2 - 2px);
 }

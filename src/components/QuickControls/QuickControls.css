@@ -1,36 +1,177 @@
-/* Everything in the main tab runs a size smaller than the kit default, so more fits on screen. */
+/* Each row (its root has .quick-controls) runs a size smaller than the kit default, so more fits on screen. */
 .quick-controls {
-  --control-md: 30px;
-  --control-sm: 28px;
-  display: flex;
+  --control-md: 28px;
+  --control-sm: 26px;
   flex: none;
-  flex-direction: column;
-  gap: var(--space-2);
   min-width: 0;
 }
 
 /*
- * Small cards that wrap into rows. Each has a natural width (flex-basis) and the spare width of a row is shared
- * out, so rows end flush; the voice card stays as narrow as its switch. On phones a card never exceeds the row.
+ * A row: one square box holding its cells (split by single 1px lines) and, at its end, the minimize button and grip.
+ * The Quick tab stacks its blocks without gaps, each overlapping the border above (MainPanel.css).
+ */
+.quick-controls__row,
+.quick-controls__row-bar {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+}
+
+.quick-controls__row {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/*
+ * Every cell draws its right and bottom line; the grid reaches 1px past the box on both sides, so the lines at the
+ * end of each line of cells and under the last one fall on the box border (the right one under the button column).
+ */
+.quick-controls__row > .quick-controls__grid {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0 -1px -1px 0;
+}
+
+/* The row's own column: the minimize chevron (like the Program / Presets one) and, under it, the drag grip
+   (.main-panel__grip). */
+.quick-controls__row-side {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  padding: 1px 2px;
+}
+
+.ui-button.quick-controls__row-collapse {
+  --_h: 24px;
+  width: 24px;
+  min-width: 24px;
+  padding: 0;
+  color: var(--text-muted);
+}
+
+.quick-controls__row-collapse svg {
+  transform: rotate(180deg);
+}
+
+/* Phones: the cells stack in one column, so the chevron and grip sit side by side at the bottom right. */
+@media (max-width: 600px) {
+  .quick-controls__row {
+    flex-direction: column;
+  }
+
+  .quick-controls__row-side {
+    flex-direction: row;
+    align-self: flex-end;
+  }
+}
+
+/* ---- Dragging a row ---- */
+
+.quick-controls__row.is-dragging,
+.quick-controls__row-bar.is-dragging {
+  z-index: 10;
+  border-color: var(--accent);
+  box-shadow: var(--shadow-md);
+  cursor: grabbing;
+}
+
+/* Where the dragged row lands: a line along the top or bottom edge of the row it is over. */
+.quick-controls__row-bar {
+  position: relative;
+}
+
+.quick-controls__row.is-drop-before::before,
+.quick-controls__row-bar.is-drop-before::before,
+.quick-controls__row.is-drop-after::after,
+.quick-controls__row-bar.is-drop-after::after {
+  position: absolute;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  height: 3px;
+  background: var(--accent);
+  content: '';
+  pointer-events: none;
+}
+
+.quick-controls__row.is-drop-before::before,
+.quick-controls__row-bar.is-drop-before::before {
+  top: 0;
+}
+
+.quick-controls__row.is-drop-after::after,
+.quick-controls__row-bar.is-drop-after::after {
+  bottom: 0;
+}
+
+/* A minimized row: one short line with what it is set to, the chevron at the end; a click brings the row back. */
+.quick-controls__row-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  min-height: 26px;
+  padding: 0 4px 0 var(--space-2);
+  color: var(--text-secondary);
+  text-align: start;
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .quick-controls__row-bar:hover {
+    background: var(--surface-2);
+  }
+}
+
+.quick-controls__row-chevron {
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--text-muted);
+}
+
+.quick-controls__row-label {
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.quick-controls__row-summary {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * Cells that wrap into lines. Each has a natural width (flex-basis) and the spare width of a line is shared out, so
+ * lines end flush; the voice cell stays as narrow as its switch. On phones a cell never exceeds the row.
  */
 .quick-controls__grid {
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
-  gap: var(--space-3);
 }
 
 .quick-controls__cell {
   display: flex;
   flex: 1 1 10rem;
   flex-direction: column;
-  gap: 6px;
+  gap: 3px;
   min-width: 0;
   max-width: 100%;
-  padding: 6px var(--space-3) var(--space-2);
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  padding: 2px var(--space-2) 6px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .quick-controls__cell--signature {
@@ -50,7 +191,7 @@
 }
 
 .quick-controls__cell--practice {
-  flex-basis: 23.5rem;
+  flex-basis: 19rem;
   container-type: inline-size;
 }
 
@@ -68,12 +209,79 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  min-height: var(--control-sm);
+  min-height: 24px;
+}
+
+/* The trainer's steppers set the second row's height. */
+.quick-controls__cell--practice {
+  gap: 3px;
+  padding-bottom: 8px;
+}
+
+/* Several things at the right of a cell's label (the speed trainer's progress, then its switch). */
+.quick-controls__cell-aside {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* Speed trainer progress: tempo now, bar of the step (or the target), and a thin bar under them. */
+.quick-controls__trainer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.quick-controls__trainer-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  color: var(--warning);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.quick-controls__trainer-text svg {
+  flex: none;
+}
+
+.quick-controls__trainer-muted {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-weight: var(--fw-semibold);
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.quick-controls__trainer-bar {
+  display: block;
+  width: 100%;
+  min-width: 4rem;
+  height: 3px;
+  overflow: hidden;
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+}
+
+.quick-controls__trainer-fill {
+  display: block;
+  height: 100%;
+  background: var(--warning);
+  border-radius: inherit;
+  transform: scaleX(var(--progress, 0));
+  transform-origin: left;
+  transition: transform var(--dur-slow) var(--ease-out);
 }
 
 .quick-controls__cell-label {
   color: var(--text-muted);
-  font-size: 0.6875rem;
+  font-size: var(--fs-xs);
   font-weight: var(--fw-bold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -148,37 +356,69 @@
 /* Below 16 px iOS zooms into a focused select, so only mouse-driven screens get the smaller text. */
 @media (pointer: fine) {
   .quick-controls .ui-select-input {
-    font-size: var(--fs-sm);
+    font-size: var(--fs-xs);
   }
 }
 
 .quick-controls .ui-toggle {
-  min-height: var(--control-sm);
+  min-height: 24px;
+}
+
+/* Smaller switches, so there is a margin between them and the cell's top border. */
+.quick-controls .ui-toggle--sm {
+  --_w: 34px;
+  --_h: 18px;
 }
 
 /* Speed trainer: four small steppers, 2 × 2 on narrow cards and on one line when the card is wide enough. */
 .quick-controls__steppers {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
+  grid-template-columns: repeat(2, max-content);
+  /* Spread over the cell's width with equal space between them and at both ends (steppers keep their size). */
+  justify-content: space-evenly;
+  gap: var(--space-1) var(--space-2);
 }
 
-@container (min-width: 400px) {
+@container (min-width: 290px) {
   .quick-controls__steppers {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(4, max-content);
   }
 }
 
 .quick-controls__steppers .ui-stepper {
+  --_h: 20px;
+  /* A little room between the label and its stepper. */
   gap: 2px;
 }
 
 .quick-controls__steppers .ui-field-label {
   font-size: var(--fs-xs);
+  line-height: 1.2;
+}
+
+/* Narrow steppers: room for 4 digits between the buttons, plus 3px each side. */
+.quick-controls__steppers .ui-stepper-field {
+  padding: 0 3px;
 }
 
 .quick-controls__steppers .ui-stepper-input {
-  font-size: var(--fs-sm);
+  width: 4ch;
+}
+
+/*
+ * One text size for the whole tab (12px). Phones keep 16px in fields they type into: iOS zooms into smaller ones.
+ */
+.quick-controls .ui-segmented-item,
+.quick-controls .ui-toggle,
+.quick-controls .ui-slider-value,
+.quick-controls .subdivision-picker__trigger {
+  font-size: var(--fs-xs);
+}
+
+@media (pointer: fine) {
+  .quick-controls .ui-stepper-input {
+    font-size: var(--fs-xs);
+  }
 }
 
 

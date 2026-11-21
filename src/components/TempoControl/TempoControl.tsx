@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
-import { MAX_BPM, MAX_TEMPO_PERCENT, MIN_BPM, MIN_TEMPO_PERCENT } from '../../core/constants'
+import { MAX_BPM, MIN_BPM } from '../../core/constants'
 import { tempoMarking } from '../../core/meter'
 import { clampTempoPercent, playedBpm, withBpm } from '../../core/settings'
 import type { Settings } from '../../core/types'
 import type { SettingsUpdater } from '../../state/useSettings'
 import { MinusIcon, PlusIcon, TrendDownIcon, TrendUpIcon } from '../icons/icons'
-import { Badge, Button, Segmented, Slider, Stepper } from '../ui/ui'
+import { Badge, Button, Segmented, Slider } from '../ui/ui'
 import './TempoControl.css'
 
 interface TempoControlProps {
@@ -17,7 +17,15 @@ interface TempoControlProps {
   playingBaseBpm: number | null
 }
 
-const PERCENT_CHIPS = [50, 75, 100, 125].map((p) => ({ value: p, label: `${p}%` }))
+const PERCENT_PRESETS = [50, 75, 100, 125]
+
+/** The quick percentages, plus the current one when it is none of them (set with the keyboard), in order. */
+function percentChips(current: number) {
+  const values = PERCENT_PRESETS.includes(current)
+    ? PERCENT_PRESETS
+    : [...PERCENT_PRESETS, current].sort((a, b) => a - b)
+  return values.map((p) => ({ value: p, label: `${p}%` }))
+}
 const SLIDER_MARKS = [60, 120, 180, 240]
 
 const HOLD_DELAY_MS = 400
@@ -144,6 +152,28 @@ export function TempoControl({ settings, onChange, playingBpm, playingBaseBpm }:
     reason = parts.length > 0 ? parts.join(' · ') : null
   }
 
+  const notes =
+    practice.enabled || differs ? (
+      <div className="tempo-control__notes">
+        {practice.enabled && (
+          <Badge tone="warning" title="The speed trainer sets the tempo while it is on. Its target is the main tempo.">
+            {practice.targetBpm >= practice.startBpm ? <TrendUpIcon size={14} /> : <TrendDownIcon size={14} />}
+            <span className="tempo-control__badge-text">
+              Trainer {practice.startBpm} → {practice.targetBpm}
+            </span>
+          </Badge>
+        )}
+        {differs && (
+          <Badge tone="accent" title={reason ? `Because of: ${reason}` : undefined}>
+            <span className="tempo-control__badge-text">
+              {playingBpm !== null ? 'Playing' : 'Plays at'} {formatBpm(actual)} BPM
+            </span>
+          </Badge>
+        )}
+        {differs && reason && <span className="tempo-control__reason">{reason}</span>}
+      </div>
+    ) : null
+
   function onValueBlur() {
     if (cancelEdit.current) {
       cancelEdit.current = false
@@ -191,109 +221,86 @@ export function TempoControl({ settings, onChange, playingBpm, playingBaseBpm }:
 
   return (
     <section className="tempo-control" aria-label="Tempo">
-      <div className="tempo-control__main">
-        <HoldButton
-          className="tempo-control__step tempo-control__step--round"
-          label="Tempo −1 BPM"
-          disabled={bpm <= MIN_BPM}
-          onStep={nudge(-1)}
-        >
-          <MinusIcon size={26} />
-        </HoldButton>
+      {/* The section is the size container; this inner box is what the container query lays out. */}
+      <div className="tempo-control__layout">
+        <div className="tempo-control__main">
+          <HoldButton
+            className="tempo-control__step tempo-control__step--round"
+            label="Tempo −1 BPM"
+            disabled={bpm <= MIN_BPM}
+            onStep={nudge(-1)}
+          >
+            <MinusIcon size={20} />
+          </HoldButton>
 
-        <div className="tempo-control__readout">
-          <span className="tempo-control__marking">{trainerPlaying ? 'Speed trainer' : tempoMarking(bpm)}</span>
-          <input
-            type="text"
-            role="spinbutton"
-            className="tempo-control__value tabular"
-            inputMode="numeric"
-            enterKeyHint="done"
-            autoComplete="off"
-            spellCheck={false}
-            maxLength={5}
-            aria-label="Tempo in BPM"
-            aria-valuenow={shown}
-            aria-valuemin={MIN_BPM}
-            aria-valuemax={MAX_BPM}
-            aria-valuetext={trainerPlaying ? `${shown} BPM, speed trainer` : `${bpm} BPM, ${tempoMarking(bpm)}`}
-            title={trainerPlaying ? 'Speed trainer tempo. Type to set the target tempo' : 'Click to type a tempo'}
-            value={draft ?? String(shown)}
-            onFocus={(e) => e.currentTarget.select()}
-            onChange={(e) => setDraft(e.currentTarget.value)}
-            onBlur={onValueBlur}
-            onKeyDown={onValueKeyDown}
-          />
-          <span className="tempo-control__unit" aria-hidden="true">
-            BPM
-          </span>
+          <div className="tempo-control__readout">
+            <span className="tempo-control__marking">{trainerPlaying ? 'Speed trainer' : tempoMarking(bpm)}</span>
+            <input
+              type="text"
+              role="spinbutton"
+              className="tempo-control__value tabular"
+              inputMode="numeric"
+              enterKeyHint="done"
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={5}
+              aria-label="Tempo in BPM"
+              aria-valuenow={shown}
+              aria-valuemin={MIN_BPM}
+              aria-valuemax={MAX_BPM}
+              aria-valuetext={trainerPlaying ? `${shown} BPM, speed trainer` : `${bpm} BPM, ${tempoMarking(bpm)}`}
+              title={trainerPlaying ? 'Speed trainer tempo. Type to set the target tempo' : 'Click to type a tempo'}
+              value={draft ?? String(shown)}
+              onFocus={(e) => e.currentTarget.select()}
+              onChange={(e) => setDraft(e.currentTarget.value)}
+              onBlur={onValueBlur}
+              onKeyDown={onValueKeyDown}
+            />
+            {/* Under the number: what changes the tempo played (trainer, percentage), else the unit. */}
+            {notes ?? (
+              <span className="tempo-control__unit" aria-hidden="true">
+                BPM
+              </span>
+            )}
+          </div>
+
+          <HoldButton
+            className="tempo-control__step tempo-control__step--round"
+            label="Tempo +1 BPM"
+            disabled={bpm >= MAX_BPM}
+            onStep={nudge(1)}
+          >
+            <PlusIcon size={20} />
+          </HoldButton>
         </div>
 
-        <HoldButton
-          className="tempo-control__step tempo-control__step--round"
-          label="Tempo +1 BPM"
-          disabled={bpm >= MAX_BPM}
-          onStep={nudge(1)}
-        >
-          <PlusIcon size={26} />
-        </HoldButton>
-      </div>
+        <div className="tempo-control__slider-row">
+          <HoldButton className="tempo-control__step" label="Tempo −5 BPM" disabled={bpm <= MIN_BPM} onStep={nudge(-5)}>
+            −5
+          </HoldButton>
+          <Slider
+            className="tempo-control__slider"
+            label="Tempo"
+            hideLabel
+            showValue={false}
+            value={bpm}
+            min={MIN_BPM}
+            max={MAX_BPM}
+            marks={SLIDER_MARKS}
+            format={(v) => `${v} BPM`}
+            onChange={setBpm}
+          />
+          <HoldButton className="tempo-control__step" label="Tempo +5 BPM" disabled={bpm >= MAX_BPM} onStep={nudge(5)}>
+            +5
+          </HoldButton>
+        </div>
 
-      <div className="tempo-control__slider-row">
-        <HoldButton className="tempo-control__step" label="Tempo −5 BPM" disabled={bpm <= MIN_BPM} onStep={nudge(-5)}>
-          −5
-        </HoldButton>
-        <Slider
-          className="tempo-control__slider"
-          label="Tempo"
-          hideLabel
-          showValue={false}
-          value={bpm}
-          min={MIN_BPM}
-          max={MAX_BPM}
-          marks={SLIDER_MARKS}
-          format={(v) => `${v} BPM`}
-          onChange={setBpm}
-        />
-        <HoldButton className="tempo-control__step" label="Tempo +5 BPM" disabled={bpm >= MAX_BPM} onStep={nudge(5)}>
-          +5
-        </HoldButton>
-      </div>
-
-      <div className="tempo-control__notes">
-        {practice.enabled && (
-          <Badge tone="warning" title="The speed trainer sets the tempo while it is on. Its target is the main tempo.">
-            {practice.targetBpm >= practice.startBpm ? <TrendUpIcon size={14} /> : <TrendDownIcon size={14} />}
-            Speed trainer {practice.startBpm} → {practice.targetBpm}
-          </Badge>
-        )}
-        {differs && (
-          <Badge tone="accent" title={reason ? `Because of: ${reason}` : undefined}>
-            {playingBpm !== null ? 'Playing' : 'Plays at'} {formatBpm(actual)} BPM
-          </Badge>
-        )}
-        {differs && reason && <span className="tempo-control__reason">{reason}</span>}
-      </div>
-
-      <div className="tempo-control__percent">
-        <Stepper
-          className="tempo-control__percent-stepper"
-          label="Tempo %"
-          hideLabel
-          size="sm"
-          suffix="%"
-          value={tempoPercent}
-          min={MIN_TEMPO_PERCENT}
-          max={MAX_TEMPO_PERCENT}
-          step={5}
-          onChange={setPercent}
-        />
         <Segmented
           className="tempo-control__chips"
-          label="Quick tempo percentage"
+          label="Tempo percentage"
           size="sm"
           value={tempoPercent}
-          options={PERCENT_CHIPS}
+          options={percentChips(tempoPercent)}
           onChange={setPercent}
         />
       </div>

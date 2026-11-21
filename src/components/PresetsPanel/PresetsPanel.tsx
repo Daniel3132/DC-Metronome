@@ -1,12 +1,21 @@
-import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from 'react'
-import { STORAGE_KEYS } from '../../core/constants'
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+} from 'react'
 import { makeId, sanitizeSettings } from '../../core/settings'
-import { FACTORY_PRESETS, type FactoryPreset } from '../../state/factoryPresets'
-import { applyFactoryPreset, applyPreset, describeFactoryPreset, describeSettings, suggestedName } from '../../state/presetSummary'
-import { clearStoredData, loadPresets, savePresets, type Preset } from '../../state/storage'
-import { CheckIcon, DownloadIcon, EditIcon, SaveIcon, TrashIcon, UploadIcon, XIcon } from '../icons/icons'
+import { applyPreset, describeSettings, suggestedName } from '../../state/presetSummary'
+import { clearStoredData, type Preset } from '../../state/storage'
+import { presetActions, usePresets } from '../../state/usePresets'
+import { CheckIcon, DownloadIcon, EditIcon, GripIcon, SaveIcon, TrashIcon, UploadIcon, XIcon } from '../icons/icons'
+import { useReorder, type Reorder } from '../ProgramPanel/useReorder'
 import type { PanelProps } from '../panelTypes'
-import { Button, IconButton, Panel } from '../ui/ui'
+import { Badge, Button, IconButton, Panel } from '../ui/ui'
 import './PresetsPanel.css'
 
 const NAME_MAX_LENGTH = 60
@@ -15,7 +24,7 @@ const EXPORT_FORMAT = 'dc-metronome-presets'
 
 const DATE_FORMAT = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
 
-type StatusArea = 'save' | 'list' | 'factory'
+type StatusArea = 'save' | 'list'
 
 interface Status {
   area: StatusArea
@@ -49,9 +58,19 @@ function presetItems(data: unknown): unknown[] | null {
   return null
 }
 
+/** Swallows the click that ends a drag, so dropping a row does not press the button under the pointer. */
+function swallowDropClick(drag: Reorder) {
+  return (e: MouseEvent) => {
+    if (!drag.consumeClick()) return
+    e.preventDefault()
+    e.stopPropagation()
+  }
+}
+
 export function PresetsPanel({ settings, onChange }: PanelProps) {
   const uid = useId()
-  const [presets, setPresets] = useState<Preset[]>(loadPresets)
+  const { presets, active } = usePresets()
+  const savedDrag = useReorder(presets.length, presetActions.move, 'y')
   const [name, setName] = useState('')
   const [renaming, setRenaming] = useState<Renaming | null>(null)
   const [confirming, setConfirming] = useState<Confirming | null>(null)
@@ -67,15 +86,6 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
     document.getElementById(id)?.focus()
   })
 
-  // Another tab saved presets: show them here too.
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEYS.presets) setPresets(loadPresets())
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [])
-
   const elId = (presetId: string, part: string) => `${uid}-${presetId}-${part}`
   const saveInputId = `${uid}-save-name`
   const placeholder = suggestedName(settings)
@@ -89,11 +99,6 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
     window.location.reload()
   }
 
-  function commit(next: Preset[]) {
-    setPresets(next)
-    savePresets(next)
-  }
-
   function report(area: StatusArea, text: string, tone: Status['tone'] = 'success') {
     setStatus({ area, text, tone })
   }
@@ -101,19 +106,15 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
   function saveCurrent(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const presetName = name.trim() || placeholder
-    commit([{ id: makeId(), name: presetName, settings, createdAt: Date.now() }, ...presets])
+    presetActions.add({ id: makeId(), name: presetName, settings, createdAt: Date.now() })
     setName('')
     report('save', `Saved "${presetName}".`)
   }
 
   function load(preset: Preset) {
     onChange((prev) => applyPreset(prev, preset.settings))
+    presetActions.setActive(preset.id)
     report('list', `Loaded "${preset.name}".`)
-  }
-
-  function loadFactory(preset: FactoryPreset) {
-    onChange((prev) => applyFactoryPreset(prev, preset))
-    report('factory', `Loaded "${preset.name}".`)
   }
 
   function startRename(preset: Preset) {
@@ -126,7 +127,7 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
     e.preventDefault()
     if (!renaming) return
     const trimmed = renaming.name.trim()
-    if (trimmed) commit(presets.map((p) => (p.id === renaming.id ? { ...p, name: trimmed } : p)))
+    if (trimmed) presetActions.rename(renaming.id, trimmed)
     focusRequest.current = elId(renaming.id, 'rename')
     setRenaming(null)
   }
@@ -150,12 +151,12 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
   function confirmAction(preset: Preset, index: number) {
     if (!confirming) return
     if (confirming.action === 'delete') {
-      commit(presets.filter((p) => p.id !== preset.id))
+      presetActions.remove(preset.id)
       const neighbour = presets[index + 1] ?? presets[index - 1]
       focusRequest.current = neighbour ? elId(neighbour.id, 'load') : saveInputId
       report('list', `Deleted "${preset.name}".`)
     } else {
-      commit(presets.map((p) => (p.id === preset.id ? { ...p, settings, createdAt: Date.now() } : p)))
+      presetActions.replace(preset.id, { settings, createdAt: Date.now() })
       focusRequest.current = elId(preset.id, 'load')
       report('list', `Updated "${preset.name}" with the current settings.`)
     }
@@ -225,7 +226,7 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
       report('list', `No valid presets found (skipped ${skipped}).`, 'danger')
       return
     }
-    commit([...imported, ...presets])
+    presetActions.addMany(imported)
     report(
       'list',
       `Imported ${plural(imported.length, 'preset')}${skipped > 0 ? `, skipped ${skipped} invalid` : ''}.`,
@@ -277,12 +278,20 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
         {presets.length === 0 ? (
           <p className="presets-panel__empty">No saved presets yet. Save one above or import a file.</p>
         ) : (
-          <ul className="presets-panel__list">
+          <ul
+            className={['presets-panel__list', savedDrag.from !== null && 'is-sorting'].filter(Boolean).join(' ')}
+            onClickCapture={swallowDropClick(savedDrag)}
+          >
             {presets.map((preset, index) => {
               const isRenaming = renaming?.id === preset.id
               const confirm = confirming?.id === preset.id ? confirming.action : null
+              const isActive = active === preset.id
               return (
-                <li key={preset.id} className="presets-panel__item">
+                <li
+                  key={preset.id}
+                  className={['presets-panel__item', savedDrag.itemClass(index)].filter(Boolean).join(' ')}
+                  {...savedDrag.itemProps(index)}
+                >
                   {isRenaming ? (
                     <form className="presets-panel__rename" onSubmit={finishRename}>
                       <label className="sr-only" htmlFor={elId(preset.id, 'rename-input')}>
@@ -313,8 +322,16 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
                     </form>
                   ) : (
                     <div className="presets-panel__row">
-                      <div className="presets-panel__info">
-                        <span className="presets-panel__name">{preset.name}</span>
+                      {presets.length > 1 && <GripIcon size={14} className="presets-panel__grip" />}
+                      <div className="presets-panel__info" title={presets.length > 1 ? 'Drag to reorder' : undefined}>
+                        <span className="presets-panel__name">
+                          {preset.name}
+                          {isActive && (
+                            <Badge tone="accent" className="presets-panel__active">
+                              Active
+                            </Badge>
+                          )}
+                        </span>
                         <span className="presets-panel__meta tabular">
                           {describeSettings(preset.settings)}
                           {preset.createdAt > 0 && ` · ${DATE_FORMAT.format(preset.createdAt)}`}
@@ -365,7 +382,7 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
                     >
                       <p id={elId(preset.id, 'confirm-text')} className="presets-panel__confirm-text">
                         {confirm === 'delete'
-                          ? `Delete "${preset.name}"? This cannot be undone.`
+                          ? `Delete "${preset.name}"? You can undo it for a few seconds.`
                           : `Replace "${preset.name}" with the current settings?`}
                       </p>
                       <div className="presets-panel__confirm-actions">
@@ -402,30 +419,6 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
           </div>
           {statusFor('list')}
         </div>
-      </Panel>
-
-      <Panel
-        title="Factory presets"
-        description="Ready-made starting points. They keep your sounds, voice pack and volumes."
-      >
-        <ul className="presets-panel__list">
-          {FACTORY_PRESETS.map((preset) => (
-            <li key={preset.id} className="presets-panel__item">
-              <div className="presets-panel__row">
-                <div className="presets-panel__info" title={preset.description}>
-                  <span className="presets-panel__name">{preset.name}</span>
-                  <span className="presets-panel__meta tabular">{describeFactoryPreset(preset)}</span>
-                </div>
-                <div className="presets-panel__actions">
-                  <Button size="sm" aria-label={`Load ${preset.name}`} onClick={() => loadFactory(preset)}>
-                    Load
-                  </Button>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-        {statusFor('factory')}
       </Panel>
 
       <Panel

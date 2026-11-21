@@ -1,6 +1,5 @@
-import { editedPart, sanitizeSettings } from '../core/settings'
+import { createSection, editedPart, sanitizeSettings } from '../core/settings'
 import type { Settings } from '../core/types'
-import type { FactoryPreset } from './factoryPresets'
 
 function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? '' : 's'}`
@@ -19,11 +18,6 @@ export function describeSettings(s: Settings): string {
   return parts.join(' · ')
 }
 
-/** The same one-line summary as a saved preset gets, for a factory preset. */
-export function describeFactoryPreset(preset: FactoryPreset): string {
-  return describeSettings(preset.build())
-}
-
 /** Default name for saving the current setup. */
 export function suggestedName(s: Settings): string {
   const section = editedPart(s)
@@ -32,20 +26,17 @@ export function suggestedName(s: Settings): string {
     : `${s.bpm} BPM ${section.beatsPerBar}/${section.beatUnit}`
 }
 
-/** Settings after loading a saved preset: everything from the preset (program included) but the volumes. */
+/**
+ * Settings after loading a saved preset: everything from the preset but the volumes. The program is bound to the
+ * preset: its sections replace the current ones, and a preset saved without program mode leaves a single section
+ * with the preset's rhythm (signature, accents, subdivision).
+ */
 export function applyPreset(prev: Settings, preset: Settings): Settings {
+  const loaded = sanitizeSettings(preset)
   // Volumes belong to the room and the headphones, not to the exercise.
-  return { ...sanitizeSettings(preset), mixer: prev.mixer }
-}
-
-/** Settings after loading a factory preset: it keeps your sounds, voice pack, volumes and flash. */
-export function applyFactoryPreset(prev: Settings, preset: FactoryPreset): Settings {
-  const built = preset.build()
-  return {
-    ...built,
-    mixer: prev.mixer,
-    sounds: prev.sounds,
-    voice: { ...built.voice, pack: prev.voice.pack },
-    visual: prev.visual,
-  }
+  const next = { ...loaded, mixer: prev.mixer }
+  if (loaded.program.enabled) return next
+  const { beatsPerBar, beatUnit, beats, subdivision } = loaded.current
+  const section = createSection({ name: 'Section 1', beatsPerBar, beatUnit, beats: [...beats], subdivision })
+  return { ...next, sections: [section], selected: null }
 }

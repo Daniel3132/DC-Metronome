@@ -47,7 +47,8 @@ export interface SequencerOptions {
  *
  * Bars and sections ("sections" here are single-meter steps; playbackSettings expands program sections into them):
  * - Outside program mode the section is `settings.activeSection`, re-read at every bar start; it loops forever.
- * - In program mode playback starts at section 0; after a section has played `bars` bars it moves to the next;
+ * - In program mode playback starts at section `activeSection` (the selected section, else 0); after a section has
+ *   played `bars` bars it moves to the next;
  *   after the last section it loops to 0 if program.loop, otherwise the sequence ends (next() returns null).
  * - A step with an `origin` reports the program section and part it comes from: sectionIndex and partIndex are the
  *   origin's, sectionBar counts from the start of the whole section (origin.barOffset + bars into the step) and
@@ -273,7 +274,7 @@ function finishPracticeBar(run: PracticeRun, practice: PracticeSettings): Practi
 
 function initialState(settings: PlaybackSettings, startTime: number): State {
   const sections = sectionsOf(settings)
-  const sectionIndex = settings.program.enabled ? 0 : clampIndex(settings.activeSection, sections.length)
+  const sectionIndex = clampIndex(settings.activeSection, sections.length)
   const state: State = {
     pending: true,
     ended: false,

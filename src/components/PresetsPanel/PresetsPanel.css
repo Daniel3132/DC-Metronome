@@ -172,3 +172,58 @@
 .presets-panel__status--danger {
   color: var(--danger);
 }
+
+/* ---- Active badge, drag to reorder (useReorder, vertical) ---- */
+
+.presets-panel__active {
+  margin-inline-start: var(--space-2);
+  vertical-align: 1px;
+}
+
+.presets-panel__grip {
+  flex: none;
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.presets-panel__item {
+  position: relative;
+  -webkit-touch-callout: none;
+}
+
+.presets-panel__item.is-dragging {
+  z-index: 10;
+  background: var(--surface-1);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  outline: 1px solid var(--accent);
+}
+
+.presets-panel__list.is-sorting,
+.presets-panel__list.is-sorting button {
+  cursor: grabbing;
+}
+
+/* Where the dragged row lands: a line across the list at the row's top (or the last row's bottom). */
+.presets-panel__item.is-drop-before::before,
+.presets-panel__item.is-drop-after::after {
+  position: absolute;
+  right: 0;
+  left: 0;
+  width: auto;
+  height: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  content: '';
+  pointer-events: none;
+}
+
+.presets-panel__item.is-drop-before::before {
+  top: -2px;
+  bottom: auto;
+}
+
+.presets-panel__item.is-drop-after::after {
+  top: auto;
+  bottom: -2px;
+}

@@ -31,3 +31,8 @@
   width: calc(100% - 52px - var(--space-3) - 24px);
   pointer-events: none;
 }
+
+/* Past 100 % the value reads as a boost. */
+.master-volume.is-boosted:not(.is-muted) .master-volume__slider .ui-slider-value {
+  color: var(--warning);
+}
