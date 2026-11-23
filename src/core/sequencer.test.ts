@@ -568,7 +568,7 @@ describe('gap trainer', () => {
     const settings: PlaybackSettings = {
       ...base,
       sections: [section({ bars: 1 }), section({ bars: 1, beatsPerBar: 3 })],
-      program: { enabled: true, loop: true },
+      program: { enabled: true, loop: true, countIn: false },
       gap: { enabled: true, playBars: 2, muteBars: 1 },
     }
     const starts = barStarts(createSequencer(settings, 0), settings, 6)
@@ -775,7 +775,7 @@ describe('program mode', () => {
   const a = section({ id: 'a', beatsPerBar: 4, bars: 2, tempo: 120 })
   const b = section({ id: 'b', beatsPerBar: 3, beatUnit: 8, bars: 1, tempo: 60 })
   const c = section({ id: 'c', beatsPerBar: 7, beatUnit: 8, bars: 1, tempo: null })
-  const looping = makeSettings({ bpm: 180, sections: [a, b, c], program: { enabled: true, loop: true } })
+  const looping = makeSettings({ bpm: 180, sections: [a, b, c], program: { enabled: true, loop: true, countIn: false } })
 
   it('plays the sections in order with their meters and tempos, then loops', () => {
     const starts = barStarts(createSequencer(looping, 0), looping, 8)
@@ -796,7 +796,7 @@ describe('program mode', () => {
   })
 
   it('ends after the last section when not looping', () => {
-    const once = { ...looping, program: { enabled: true, loop: false } }
+    const once = { ...looping, program: { enabled: true, loop: false, countIn: false } }
     const seq = createSequencer(once, 0)
     const events = takeAll(seq, once)
     expect(events).toHaveLength(4 + 4 + 3 + 7)
@@ -833,7 +833,7 @@ describe('program mode', () => {
         section({ beatsPerBar: 4, bars: 1, tempo: 120, subdivision: 'eighths' }),
         section({ beatsPerBar: 2, bars: 1, tempo: 60, subdivision: 'eighths' }),
       ],
-      program: { enabled: true, loop: false },
+      program: { enabled: true, loop: false, countIn: false },
     })
     const events = takeAll(createSequencer(settings, 0), settings)
     expect(events.map((e) => e.time)).toEqual([0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5])
@@ -842,7 +842,7 @@ describe('program mode', () => {
   })
 
   it('loops a single section', () => {
-    const settings = makeSettings({ sections: [section({ bars: 2 })], program: { enabled: true, loop: true } })
+    const settings = makeSettings({ sections: [section({ bars: 2 })], program: { enabled: true, loop: true, countIn: false } })
     const starts = barStarts(createSequencer(settings, 0), settings, 5)
     expect(starts.map((e) => [e.sectionIndex, e.sectionBar])).toEqual([
       [0, 0],
@@ -854,7 +854,7 @@ describe('program mode', () => {
   })
 
   it('continues from the current section and its bar count when switched on during playback', () => {
-    const simple = { ...looping, program: { enabled: false, loop: true }, activeSection: 1 }
+    const simple = { ...looping, program: { enabled: false, loop: true, countIn: false }, activeSection: 1 }
     const program = { ...looping, activeSection: 1 }
     const seq = createSequencer(simple, 0)
     barStarts(seq, simple, 3) // section b, bars 0..2 (sectionBar 2 ≥ b.bars)
@@ -868,7 +868,7 @@ describe('program mode', () => {
   })
 
   it('keeps counting the current section when switched on before it is finished', () => {
-    const simple = { ...looping, program: { enabled: false, loop: true }, activeSection: 0 }
+    const simple = { ...looping, program: { enabled: false, loop: true, countIn: false }, activeSection: 0 }
     const seq = createSequencer(simple, 0)
     take(seq, simple, 1)
     const starts = barStarts(seq, looping, 3)
@@ -882,7 +882,7 @@ describe('program mode', () => {
   it('returns to the active section when switched off', () => {
     const seq = createSequencer(looping, 0)
     barStarts(seq, looping, 3) // a, a, b
-    const simple = { ...looping, program: { enabled: false, loop: true }, activeSection: 0 }
+    const simple = { ...looping, program: { enabled: false, loop: true, countIn: false }, activeSection: 0 }
     const rest = take(seq, simple, 2)
     // Bar 2 stays on b until it ends, at the global tempo now.
     expect(rest.map((e) => [e.sectionIndex, e.bpm, e.sectionBars])).toEqual([
@@ -1037,7 +1037,7 @@ describe('practice mode', () => {
       bpm: 200,
       tempoPercent: 75,
       sections: [section({ tempo: 90, bars: 1 })],
-      program: { enabled: true, loop: true },
+      program: { enabled: true, loop: true, countIn: false },
     })
     expect(starts.map((e) => [e.baseBpm, e.bpm])).toEqual([
       [100, 100],
@@ -1109,7 +1109,7 @@ describe('practice mode', () => {
   it('stops at bar granularity with program sections', () => {
     const settings = makeSettings({
       sections: [section({ beatsPerBar: 3, bars: 1 }), section({ beatsPerBar: 5, bars: 1 })],
-      program: { enabled: true, loop: true },
+      program: { enabled: true, loop: true, countIn: false },
       practice: practice({ everyBars: 1, atTarget: 'stop' }),
     })
     const events = takeAll(createSequencer(settings, 0), settings)
@@ -1214,7 +1214,7 @@ describe('robustness', () => {
               settings = { ...settings, activeSection: int(0, sections.length - 1) }
               break
             case 7:
-              settings = { ...settings, program: { enabled: rand() < 0.5, loop: rand() < 0.8 } }
+              settings = { ...settings, program: { enabled: rand() < 0.5, loop: rand() < 0.8, countIn: false } }
               break
             case 8:
               settings = { ...settings, gap: { enabled: rand() < 0.5, playBars: int(1, 3), muteBars: int(1, 3) } }

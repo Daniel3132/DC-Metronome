@@ -39,7 +39,7 @@ interface Graph {
   channels: Record<Channel, GainNode>
 }
 
-const ROLES: readonly SoundRole[] = ['accent', 'medium', 'beat', 'sub']
+const ROLES: readonly SoundRole[] = ['accent', 'medium', 'beat', 'sub', 'cue']
 const BUILT_IN_IDS: ReadonlySet<string> = new Set(BUILT_IN_SOUNDS.map((sound) => sound.id))
 
 /** Scheduler wake-up interval (ms). */
@@ -119,6 +119,7 @@ function sameMixer(a: MixerSettings, b: MixerSettings): boolean {
       a.medium === b.medium &&
       a.beat === b.beat &&
       a.sub === b.sub &&
+      a.cue === b.cue &&
       a.voice === b.voice &&
       a.muted === b.muted)
   )
@@ -198,7 +199,7 @@ async function decodeCustomSound(ctx: BaseAudioContext, id: CustomSoundId): Prom
  * - A timer running in a Web Worker (created from an inline Blob so background tabs keep ticking) wakes the
  *   scheduler every ~25 ms; the scheduler asks the Sequencer for every pulse whose time falls within the
  *   look-ahead window (~0.12 s) and schedules AudioBufferSourceNodes at exact AudioContext times.
- * - Audio graph: per-role channel gains (accent, medium, beat, sub, voice) → master gain → AnalyserNode → destination.
+ * - Audio graph: per-role channel gains (accent, medium, beat, sub, cue, voice) → master gain → AnalyserNode → destination.
  *   Mixer changes apply immediately with a short ramp (setTargetAtTime) to avoid zipper noise; `muted` sets the
  *   master to 0.
  * - Click buffers: built-in sounds rendered once per (id, role) via renderBuiltInSound; custom sounds decoded from
@@ -471,7 +472,7 @@ export class MetronomeEngine {
       gain.connect(master)
       return gain
     }
-    this.graph = { master, analyser, channels: { accent: channel(), medium: channel(), beat: channel(), sub: channel(), voice: channel() } }
+    this.graph = { master, analyser, channels: { accent: channel(), medium: channel(), beat: channel(), sub: channel(), cue: channel(), voice: channel() } }
     this.ctx = ctx
     ctx.addEventListener('statechange', this.handleStateChange)
     this.listenForVisibility()

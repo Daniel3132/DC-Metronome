@@ -15,20 +15,27 @@ import {
   editedPart,
   effectiveBpm,
   findPart,
+  makeId,
   sectionBars,
   selectPart,
   selectSection,
+  withBpm,
 } from '../../core/settings'
+import { importSong, SONG_FILE_ACCEPT, type ImportedSong } from '../../core/import/importSong'
+import { toSections, type ParsedSection } from '../../core/programText'
+import { presetActions } from '../../state/usePresets'
 import type { Part, Section, Settings } from '../../core/types'
 import {
   CheckIcon,
   GripIcon,
   PlusIcon,
   TrashIcon,
+  UploadIcon,
   XIcon,
 } from '../icons/icons'
 import type { PanelProps } from '../panelTypes'
 import { Button, Panel, Stepper, Toggle } from '../ui/ui'
+import { ImportPreview } from './ImportPreview'
 import { ProgramQuickEntry } from './ProgramQuickEntry'
 import { useReorder } from './useReorder'
 import './ProgramPanel.css'
@@ -124,6 +131,11 @@ export function ProgramPanel({
 }: ProgramPanelProps) {
   const uid = useId()
   const [status, setStatus] = useState('')
+  // A song file being read, then shown for review (ImportPreview); its error stays until the next attempt.
+  const [importing, setImporting] = useState(false)
+  const [imported, setImported] = useState<ImportedSong | null>(null)
+  const [importError, setImportError] = useState('')
+  const fileInput = useRef<HTMLInputElement>(null)
   // Reordering moves DOM nodes (and can drop focus); the handler names the element to focus after the next commit.
   const focusRequest = useRef<FocusRequest | null>(null)
 
@@ -273,6 +285,35 @@ export function ProgramPanel({
     setStatus(`Removed part ${index + 1}.`)
   }
 
+  async function readSongFile(file: File) {
+    setImporting(true)
+    setImportError('')
+    try {
+      const song = await importSong(file)
+      if (song.sections.length === 0) throw new Error('No bars were found in this file.')
+      setImported(song)
+      setStatus(`Read ${plural(song.sections.length, 'section')} from ${file.name}. Review them, then accept.`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'This file could not be read.'
+      setImportError(message)
+      setStatus(message)
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  /** The reviewed sections become the program of a new preset (named after the file), which is loaded. */
+  function acceptImport(name: string, parsed: ParsedSection[]) {
+    const sections = toSections(parsed)
+    const tempo = sections[0]?.tempo
+    const base = tempo != null ? withBpm(settings, tempo) : settings
+    const next: Settings = { ...base, sections, selected: null, program: { ...base.program, enabled: true } }
+    onChange(() => next)
+    presetActions.add({ id: makeId(), name, settings: next, createdAt: Date.now() })
+    setImported(null)
+    setStatus(`Created the preset "${name}" with ${plural(sections.length, 'section')}.`)
+  }
+
   function stepPart(section: Section, index: number, delta: -1 | 1) {
     const to = index + delta
     if (to < 0 || to >= section.parts.length) return
@@ -315,6 +356,28 @@ export function ProgramPanel({
         <>
           <span
             className="program-panel__loop"
+            title="Play one bar of the starting section (beats only) before the program starts"
+          >
+            <Toggle
+              size="sm"
+              label="Count-in"
+              checked={program.countIn}
+              onChange={(countIn) => onChange((prev) => ({ ...prev, program: { ...prev.program, countIn } }))}
+            />
+          </span>
+          <span
+            className="program-panel__loop"
+            title="Cue: beat 1 of every section plays the cue sound, even when the signature stays the same"
+          >
+            <Toggle
+              size="sm"
+              label="Cue"
+              checked={settings.cue.sectionChange}
+              onChange={(sectionChange) => onChange((prev) => ({ ...prev, cue: { ...prev.cue, sectionChange } }))}
+            />
+          </span>
+          <span
+            className="program-panel__loop"
             title={program.loop ? 'Starts over after the last section.' : 'Stops after the last section.'}
           >
             <Toggle
@@ -341,6 +404,28 @@ export function ProgramPanel({
             <Button
               size="sm"
               variant="ghost"
+              icon={<UploadIcon size={16} />}
+              disabled={importing}
+              title="Read sections, signatures and tempos from a MIDI or Guitar Pro file into a new preset"
+              onClick={() => fileInput.current?.click()}
+            >
+              {importing ? 'Reading…' : 'Import'}
+            </Button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept={SONG_FILE_ACCEPT}
+              hidden
+              onChange={(e) => {
+                const file = e.currentTarget.files?.[0]
+                // Cleared, so choosing the same file again reads it again.
+                e.currentTarget.value = ''
+                if (file) void readSongFile(file)
+              }}
+            />
+            <Button
+              size="sm"
+              variant="ghost"
               icon={<TrashIcon size={16} />}
               disabled={sections.length === 0}
               title="Delete every section of the program"
@@ -349,6 +434,12 @@ export function ProgramPanel({
               Clear all
             </Button>
           </div>
+
+          {importError !== '' && (
+            <p className="program-panel__import-error" role="alert">
+              {importError}
+            </p>
+          )}
 
           <ol
             className={['program-panel__matrix', sectionDrag.from !== null && 'is-sorting'].filter(Boolean).join(' ')}
@@ -359,7 +450,8 @@ export function ProgramPanel({
               const isActive = index === editIndex
               const isPlaying = index === playingIndex
               const total = sectionBars(section)
-              const bar = isPlaying && pulse && pulse.sectionBars !== null ? pulse.sectionBar + 1 : null
+              const bar =
+                isPlaying && pulse && pulse.sectionBars !== null && !pulse.countIn ? pulse.sectionBar + 1 : null
               const shown = section.parts.slice(0, CELL_PARTS)
               const meters = shown.map(meterOf).join(' + ') + (section.parts.length > CELL_PARTS ? ' …' : '')
               return (
@@ -406,7 +498,7 @@ export function ProgramPanel({
                       {section.repeats > 1 && (
                         <span className="program-panel__repeat tabular">×{section.repeats}</span>
                       )}
-                      {bar !== null ? `bar ${bar}/${total}` : plural(total, 'bar')}
+                      {isPlaying && pulse?.countIn ? 'count-in' : bar !== null ? `bar ${bar}/${total}` : plural(total, 'bar')}
                       {section.tempo !== null && ` @${section.tempo}`}
                     </span>
                     <span className="program-panel__cell-beats" aria-hidden="true">
@@ -643,6 +735,9 @@ export function ProgramPanel({
       <p role="status" className="sr-only">
         {status}
       </p>
+      {imported !== null && (
+        <ImportPreview song={imported} bpm={settings.bpm} onAccept={acceptImport} onCancel={() => setImported(null)} />
+      )}
     </Panel>
   )
 }

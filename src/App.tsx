@@ -51,6 +51,7 @@ const CONTROLS = [
   '[role="option"]',
   '[role="listbox"]',
   '[role="dialog"]',
+  'dialog',
   '.ui-stepper-control',
   '.ui-slider-control',
   '.ui-select-wrap',

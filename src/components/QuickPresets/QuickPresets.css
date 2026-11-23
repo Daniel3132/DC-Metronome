@@ -78,8 +78,9 @@
   /* Room for the delete button in the corner. */
   padding-right: 16px;
   overflow: hidden;
-  font-size: var(--fs-sm);
+  font-size: 0.9375rem;
   font-weight: var(--fw-semibold);
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

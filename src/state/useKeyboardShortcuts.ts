@@ -70,8 +70,13 @@ function isTextEntry(target: EventTarget | null): boolean {
   )
 }
 
+/** A modal dialog (the song import preview) owns the keyboard while it is open. */
+function modalOpen(): boolean {
+  return document.querySelector('dialog[open]') !== null
+}
+
 function ignored(e: KeyboardEvent): boolean {
-  return e.ctrlKey || e.metaKey || e.altKey || e.isComposing || isTextEntry(e.target)
+  return e.ctrlKey || e.metaKey || e.altKey || e.isComposing || isTextEntry(e.target) || modalOpen()
 }
 
 /** An open popover (the shortcuts help) owns Escape: it closes itself first. */
@@ -102,7 +107,8 @@ function isSpace(e: KeyboardEvent): boolean {
 }
 
 /**
- * Global keyboard shortcuts (see SHORTCUTS). Ignored while typing in a form field or with Ctrl/Meta/Alt.
+ * Global keyboard shortcuts (see SHORTCUTS). Ignored while typing in a form field, with Ctrl/Meta/Alt, or while a
+ * modal dialog is open.
  * Space always means start/stop, so it never also activates the focused button.
  */
 export function useKeyboardShortcuts(handlers: ShortcutHandlers): void {

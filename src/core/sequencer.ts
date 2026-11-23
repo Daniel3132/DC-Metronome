@@ -48,7 +48,8 @@ export interface SequencerOptions {
  * Bars and sections ("sections" here are single-meter steps; playbackSettings expands program sections into them):
  * - Outside program mode the section is `settings.activeSection`, re-read at every bar start; it loops forever.
  * - In program mode playback starts at section `activeSection` (the selected section, else 0); after a section has
- *   played `bars` bars it moves to the next;
+ *   played `bars` bars it moves to the next; a `countIn` step plays once and is skipped when the program loops, and the
+ *   gap and speed trainers start afresh after it (a count-in bar is never silenced by the gap trainer);
  *   after the last section it loops to 0 if program.loop, otherwise the sequence ends (next() returns null).
  * - A step with an `origin` reports the program section and part it comes from: sectionIndex and partIndex are the
  *   origin's, sectionBar counts from the start of the whole section (origin.barOffset + bars into the step) and
@@ -73,6 +74,8 @@ export interface SequencerOptions {
  *
  * Voice and clicks, for a pulse that is not silent:
  * - pulse 0: role 'accent' for accent, 'medium' for medium (sub-accent), 'beat' for normal; gain = LEVEL_GAIN[level];
+ *   beat 0 of a cue bar uses role 'cue' instead (settings.cue: the first bar of a program section, every N-th bar of a
+ *   section / of the free rhythm; never in the count-in);
  *   voice = beat number word ('1'..'16') when voice.enabled; voiceGain = LEVEL_VOICE_GAIN[level].
  * - pulse > 0: role 'sub'; gain 1; voice = the subdivision's word for that pulse
  *   when voice.enabled && voice.subdivisions (may be null); voiceGain = SUB_VOICE_GAIN (0 when voice is null).
@@ -301,11 +304,14 @@ function initialState(settings: PlaybackSettings, startTime: number): State {
 
 /** Bar-boundary work, in order: gap counter, speed trainer, program advance, next section. `state` is at the boundary. */
 function startBar(state: State, settings: PlaybackSettings): State {
-  const gap = gapForNewBar(state, settings.gap)
+  const sections = sectionsOf(settings)
+  // The count-in does not count: the bar after it starts the gap and speed trainers afresh.
+  const afterCountIn = sections[state.sectionIndex]?.countIn === true
+  const gap = gapForNewBar(afterCountIn ? { ...state, gapArmed: false } : state, settings.gap)
 
   let practice: PracticeRun | null = null
   if (settings.practice.enabled) {
-    if (state.practice && state.practice.key === practiceKey(settings.practice)) {
+    if (!afterCountIn && state.practice && state.practice.key === practiceKey(settings.practice)) {
       practice = finishPracticeBar(state.practice, settings.practice)
       if (!practice) return { ...state, ended: true }
     } else {
@@ -313,7 +319,6 @@ function startBar(state: State, settings: PlaybackSettings): State {
     }
   }
 
-  const sections = sectionsOf(settings)
   let sectionIndex = state.sectionIndex
   let sectionBar = state.sectionBar + 1
   if (settings.program.enabled) {
@@ -322,7 +327,8 @@ function startBar(state: State, settings: PlaybackSettings): State {
       sectionBar = 0
       if (sectionIndex >= sections.length) {
         if (!settings.program.loop) return { ...state, ended: true }
-        sectionIndex = 0
+        // The count-in only plays once, before the first bar.
+        sectionIndex = Math.max(0, sections.findIndex((step) => !step.countIn))
       }
     }
   } else {
@@ -395,6 +401,15 @@ function advance(state: State, settings: PlaybackSettings): State {
   return s.beat + 1 < beatsPerBar ? { ...boundary, beat: s.beat + 1 } : startBar(boundary, settings)
 }
 
+/** Beat 1 of this bar sounds the cue: a program section starts here, or an "every N bars" phrase does. */
+function isCueBar(settings: PlaybackSettings, section: PlaySection, sectionBar: number): boolean {
+  const { cue } = settings
+  if (!cue || section.countIn) return false
+  if (cue.sectionChange && settings.program.enabled && section.origin && sectionBar === 0) return true
+  const every = Math.round(cue.everyBars)
+  return cue.every && every >= 1 && sectionBar % every === 0
+}
+
 function pulseEvent(state: State, settings: PlaybackSettings): PulseEvent {
   const section = sectionsOf(settings)[state.sectionIndex]
   const subdivision = getSubdivision(section.subdivision)
@@ -403,7 +418,8 @@ function pulseEvent(state: State, settings: PlaybackSettings): PulseEvent {
   const beatDuration = beatSeconds(bpm, section.beatUnit)
   const following = subdivision.pulses[state.pulse + 1] ?? 1
   const level = levelOf(section, state.beat)
-  const gapBar = state.gapBar && settings.gap.enabled
+  const countIn = section.countIn === true
+  const gapBar = state.gapBar && settings.gap.enabled && !countIn
   const practice = settings.practice.enabled ? state.practice : null
 
   let silentReason: SilentReason | null = null
@@ -412,14 +428,16 @@ function pulseEvent(state: State, settings: PlaybackSettings): PulseEvent {
   else if (level === 'mute') silentReason = 'level'
 
   const origin = section.origin
+  const sectionBar = (origin?.barOffset ?? 0) + state.sectionBar
   const event = {
     time: state.time,
     duration: (following - state.offset) * beatDuration,
     beatDuration,
     sectionIndex: origin?.section ?? state.sectionIndex,
     partIndex: origin?.part ?? 0,
-    sectionBar: (origin?.barOffset ?? 0) + state.sectionBar,
+    sectionBar,
     sectionBars: settings.program.enabled ? (origin?.sectionBars ?? barsOf(section)) : null,
+    countIn,
     subdivision: subdivision.id,
     totalBar: state.totalBar,
     beat: state.beat,
@@ -447,7 +465,9 @@ function pulseEvent(state: State, settings: PlaybackSettings): PulseEvent {
   let voice: VoiceWord | null = null
   let voiceGain = 0
   if (state.pulse === 0) {
-    role = level === 'accent' ? 'accent' : level === 'medium' ? 'medium' : 'beat'
+    role = isCueBar(settings, section, sectionBar) && state.beat === 0
+      ? 'cue'
+      : level === 'accent' ? 'accent' : level === 'medium' ? 'medium' : 'beat'
     gain = LEVEL_GAIN[level]
     if (settings.voice.enabled) voice = BEAT_WORDS[state.beat] ?? null
     if (voice !== null) voiceGain = LEVEL_VOICE_GAIN[level]

@@ -1,0 +1,161 @@
+/* A native modal dialog in the top layer, centered by its UA margins. */
+.import-preview {
+  width: min(640px, calc(100vw - 2 * var(--space-4)));
+  max-height: calc(100dvh - 2 * var(--space-4));
+  padding: 0;
+  overflow: hidden;
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
+}
+
+.import-preview::backdrop {
+  background: var(--overlay);
+}
+
+.import-preview__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: calc(100dvh - 2 * var(--space-4) - 2px);
+  padding: var(--space-4) var(--space-5) var(--space-4);
+}
+
+.import-preview__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.import-preview__title {
+  font-size: var(--fs-lg);
+}
+
+.import-preview__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.import-preview__label {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.import-preview__input {
+  min-width: 0;
+  min-height: var(--control-sm);
+  padding: 0 var(--space-3);
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: var(--fs-md);
+}
+
+.import-preview__input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.import-preview__summary {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+
+.import-preview__warnings {
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-6);
+  background: var(--warning-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: var(--fs-xs);
+}
+
+/* The only part that scrolls: header, name and buttons stay in view. */
+.import-preview__sections {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.import-preview__section {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
+.import-preview__index {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+
+.import-preview__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.import-preview__section-name {
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+
+.import-preview__parts {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-preview__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* Phones: name and meters on their own line, the steppers and delete under them. */
+@media (max-width: 599px) {
+  .import-preview__form {
+    padding: var(--space-3);
+  }
+
+  .import-preview__section {
+    grid-template-columns: 1.5rem auto auto 1fr;
+  }
+
+  .import-preview__main {
+    grid-column: 2 / -1;
+  }
+
+  .import-preview__section > :nth-child(3) {
+    grid-column: 2;
+  }
+
+  .import-preview__section > :last-child {
+    justify-self: end;
+  }
+}

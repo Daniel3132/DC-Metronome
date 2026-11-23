@@ -304,13 +304,14 @@ describe('createDefaultSettings', () => {
         subdivision: 'quarter',
         bars: 1,
       },
-      program: { enabled: false, loop: true },
+      program: { enabled: false, loop: true, countIn: false },
       gap: { enabled: false, playBars: 2, muteBars: 1 },
       randomMute: { enabled: false, percent: 25 },
       practice: { enabled: false, startBpm: 80, targetBpm: 120, targetRatio: 1.5, stepBpm: 5, everyBars: 2, atTarget: 'hold' },
-      sounds: { accent: 'click', medium: 'click', beat: 'click', sub: 'click' },
+      cue: { sectionChange: false, every: false, everyBars: 4 },
+      sounds: { accent: 'click', medium: 'click', beat: 'click', sub: 'click', cue: 'bell' },
       voice: { enabled: false, pack: 'en-male', subdivisions: false, clicks: true, announceSections: false },
-      mixer: { master: 0.8, accent: 1, medium: 0.8, beat: 0.85, sub: 0.6, voice: 1, muted: false },
+      mixer: { master: 0.8, accent: 1, medium: 0.8, beat: 0.85, sub: 0.6, cue: 1, voice: 1, muted: false },
       visual: { flash: false },
     })
   })
@@ -395,7 +396,7 @@ describe('sanitizeSettings', () => {
     expect(settings.practice.targetBpm).toBe(MAX_BPM)
     expect(settings.practice.stepBpm).toBe(1)
     expect(settings.practice.everyBars).toBe(MAX_PRACTICE_EVERY_BARS)
-    expect(settings.mixer).toEqual({ master: 1.25, accent: 0, medium: 1, beat: 0.33, sub: 0.6, voice: 1, muted: false })
+    expect(settings.mixer).toEqual({ master: 1.25, accent: 0, medium: 1, beat: 0.33, sub: 0.6, cue: 1, voice: 1, muted: false })
 
     const high = sanitizeSettings({
       bpm: 99.6,
@@ -554,7 +555,7 @@ describe('sanitizeSettings', () => {
 
   it('keeps built-in and custom sound ids and replaces unknown ones', () => {
     const settings = sanitizeSettings({ sounds: { accent: 'custom:abc-123', beat: 'woodblock', sub: 'laser' } })
-    expect(settings.sounds).toEqual({ accent: 'custom:abc-123', medium: 'custom:abc-123', beat: 'woodblock', sub: 'click' })
+    expect(settings.sounds).toEqual({ accent: 'custom:abc-123', medium: 'custom:abc-123', beat: 'woodblock', sub: 'click', cue: 'bell' })
     expect(sanitizeSettings({ sounds: { accent: 'custom:', beat: 42, sub: null } }).sounds).toEqual(defaults.sounds)
   })
 
@@ -594,13 +595,14 @@ describe('sanitizeSettings', () => {
       sections,
       selected: { section: sections[1].id, part: sections[1].parts[1].id },
       current: toCurrent(createPart({ beatsPerBar: 5, beatUnit: 8, subdivision: 'swing' })),
-      program: { enabled: true, loop: false },
+      program: { enabled: true, loop: false, countIn: true },
       gap: { enabled: true, playBars: 64, muteBars: 64 },
       randomMute: { enabled: false, percent: 100 },
       practice: { enabled: true, startBpm: 300, targetBpm: MIN_BPM, targetRatio: MIN_BPM / 300, stepBpm: 50, everyBars: 64, atTarget: 'stop' },
-      sounds: { accent: 'bell', medium: 'cowbell', beat: 'custom:x', sub: 'kick' },
+      cue: { sectionChange: true, every: true, everyBars: 64 },
+      sounds: { accent: 'bell', medium: 'cowbell', beat: 'custom:x', sub: 'kick', cue: 'rim' },
       voice: { enabled: true, pack: 'en-female', subdivisions: true, clicks: false, announceSections: true },
-      mixer: { master: 0, accent: 0.123, medium: 0.4, beat: 1, sub: 0, voice: 0.5, muted: true },
+      mixer: { master: 0, accent: 0.123, medium: 0.4, beat: 1, sub: 0, cue: 0.7, voice: 0.5, muted: true },
       visual: { flash: true },
     }
     expect(sanitizeSettings(settings)).toEqual(settings)
@@ -725,11 +727,11 @@ describe('playbackSettings', () => {
       createSection({ name: 'Mixed', parts: [{ beatsPerBar: 2 }, { beatsPerBar: 4, bars: 2 }], repeats: 2, tempo: 90 }),
       createSection({ name: 'Out', beatsPerBar: 3, bars: 1 }),
     ]
-    return { ...createDefaultSettings(), bpm: 120, sections, program: { enabled: true, loop: false } }
+    return { ...createDefaultSettings(), bpm: 120, sections, program: { enabled: true, loop: false, countIn: false } }
   }
 
   it('plays only the free rhythm outside program mode with nothing selected', () => {
-    const settings = { ...mixed(), program: { enabled: false, loop: true } }
+    const settings = { ...mixed(), program: { enabled: false, loop: true, countIn: false } }
     const solo = playbackSettings(settings)
     expect(solo.sections).toEqual([{ ...settings.current, name: '', tempo: null }])
     expect(solo.activeSection).toBe(0)
@@ -775,9 +777,9 @@ describe('playbackSettings', () => {
 
   it('loops the selected section outside program mode, at the main tempo', () => {
     const base = mixed()
-    const settings = selectSection({ ...base, program: { enabled: false, loop: false } }, 0)
+    const settings = selectSection({ ...base, program: { enabled: false, loop: false, countIn: false } }, 0)
     const played = playbackSettings(settings)
-    expect(played.program).toEqual({ enabled: true, loop: true })
+    expect(played.program).toEqual({ enabled: true, loop: true, countIn: false })
     expect(played.sections.map((s) => [s.beatsPerBar, s.tempo])).toEqual([
       [2, null],
       [4, null],

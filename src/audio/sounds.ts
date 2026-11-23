@@ -33,7 +33,7 @@ interface PartialOptions {
 
 const TWO_PI = Math.PI * 2
 const HALF_PI = Math.PI / 2
-const PEAK: Readonly<Record<SoundRole, number>> = { accent: 0.9, medium: 0.9, beat: 0.9, sub: 0.6 }
+const PEAK: Readonly<Record<SoundRole, number>> = { accent: 0.9, medium: 0.9, beat: 0.9, sub: 0.6, cue: 0.95 }
 /** Short enough to keep the onset tight, long enough to avoid a hard step at sample 0. */
 const ATTACK = 0.001
 /** Partials above this fraction of the sample rate are left out (no aliasing). */
@@ -50,9 +50,13 @@ const BELL_PARTIALS = [
   [8.933, 0.12, 0.12],
 ] as const
 
-/** The value for `role`; the sub-accent sits halfway (geometrically) between accent and beat, e.g. a pitch in between. */
+/**
+ * The value for `role`; the sub-accent sits halfway (geometrically) between accent and beat, e.g. a pitch in between,
+ * and the cue half a step beyond the accent (away from the beat), so it stands out even with the accent's sound.
+ */
 function at(role: SoundRole, values: PerRole<number>): number {
   if (role === 'medium') return Math.sqrt(values[0] * values[1])
+  if (role === 'cue') return values[0] > 0 && values[1] > 0 ? values[0] * Math.sqrt(values[0] / values[1]) : values[0]
   return values[role === 'accent' ? 0 : role === 'beat' ? 1 : 2]
 }
 
@@ -273,7 +277,7 @@ const RECIPES: Readonly<Record<BuiltInSoundId, (role: SoundRole) => Recipe>> = {
 
   // Mechanical metronome: the accent is the lower, fuller "tock"; beats are a bright wooden "tick".
   tick: (role) => {
-    const tock = role === 'accent'
+    const tock = role === 'accent' || role === 'cue'
     const f = at(role, [1450, 2900, 2600])
     const tau = at(role, [0.0065, 0.0045, 0.003])
     return {
@@ -345,7 +349,7 @@ function synthesize(id: BuiltInSoundId, role: SoundRole, sampleRate: number): Sa
 
 /**
  * Synthesize a built-in click as mono samples in -1..1 (pure DSP, no Web Audio, so it is unit-testable).
- * Each sound has four variants: 'accent' is brighter/higher and punchier, 'medium' (sub-accent) sits between
+ * Each sound has five variants: 'cue' goes beyond the accent, 'accent' is brighter/higher and punchier, 'medium' (sub-accent) sits between
  * accent and beat, 'beat' is the base sound,
  * 'sub' is softer/lower and shorter, so the roles are distinguishable even at the same volume.
  * Sounds are short (≤ 0.5 s; most ≤ 0.15 s), start with energy within the first millisecond (tight timing),

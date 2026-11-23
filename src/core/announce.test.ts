@@ -10,7 +10,7 @@ function program(sections: Section[], patch: Partial<Settings> = {}): Settings {
   return {
     ...d,
     sections,
-    program: { enabled: true, loop: false },
+    program: { enabled: true, loop: false, countIn: false },
     voice: { ...d.voice, announceSections: true },
     ...patch,
   }
@@ -46,7 +46,7 @@ describe('sectionAnnouncement', () => {
   })
 
   it('wraps to the first section when the program loops', () => {
-    const found = announcements(program(song(), { program: { enabled: true, loop: true } }), 4 * 4 * 8)
+    const found = announcements(program(song(), { program: { enabled: true, loop: true, countIn: false } }), 4 * 4 * 8)
     expect(found.slice(0, 5)).toEqual([
       { bar: 0, text: 'Intro' },
       { bar: 1, text: 'Verse' },
@@ -70,8 +70,8 @@ describe('sectionAnnouncement', () => {
   it('stays quiet when off, outside program mode, or for a single section', () => {
     const d = createDefaultSettings()
     expect(announcements(program(song(), { voice: d.voice }))).toEqual([])
-    expect(announcements(program(song(), { program: { enabled: false, loop: false } }), 64)).toEqual([])
-    const single = program([createSection({ name: 'Only', bars: 2 })], { program: { enabled: true, loop: true } })
+    expect(announcements(program(song(), { program: { enabled: false, loop: false, countIn: false } }), 64)).toEqual([])
+    const single = program([createSection({ name: 'Only', bars: 2 })], { program: { enabled: true, loop: true, countIn: false } })
     expect(announcements(single, 64)).toEqual([{ bar: 0, text: 'Only' }])
   })
 
