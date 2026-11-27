@@ -5,6 +5,7 @@ import {
   CUSTOM_SOUND_PREFIX,
   MAX_BEATS_PER_BAR,
   MAX_BPM,
+  MAX_CUE_EVERY_BARS,
   MAX_GAP_BARS,
   MAX_MASTER_VOLUME,
   MAX_PRACTICE_EVERY_BARS,
@@ -185,13 +186,14 @@ export function createDefaultSettings(): Settings {
     sections: [section],
     selected: null,
     current: toCurrent(section.parts[0]),
-    program: { enabled: false, loop: true },
+    program: { enabled: false, loop: true, countIn: false },
     gap: { enabled: false, playBars: 2, muteBars: 1 },
     randomMute: { enabled: false, percent: 25 },
     practice: { enabled: false, startBpm: 80, targetBpm: DEFAULT_BPM, targetRatio: 1.5, stepBpm: 5, everyBars: 2, atTarget: 'hold' },
-    sounds: { accent: 'click', medium: 'click', beat: 'click', sub: 'click' },
+    cue: { sectionChange: false, every: false, everyBars: 4 },
+    sounds: { accent: 'click', medium: 'click', beat: 'click', sub: 'click', cue: 'bell' },
     voice: { enabled: false, pack: 'en-male', subdivisions: false, clicks: true, announceSections: false },
-    mixer: { master: 0.8, accent: 1, medium: 0.8, beat: 0.85, sub: 0.6, voice: 1, muted: false },
+    mixer: { master: 0.8, accent: 1, medium: 0.8, beat: 0.85, sub: 0.6, cue: 1, voice: 1, muted: false },
     visual: { flash: false },
   }
 }
@@ -277,6 +279,7 @@ function sanitizeMixer(raw: Fields, d: MixerSettings): MixerSettings {
     medium: numberIn(raw.medium, d.medium, 0, 1),
     beat: numberIn(raw.beat, d.beat, 0, 1),
     sub: numberIn(raw.sub, d.sub, 0, 1),
+    cue: numberIn(raw.cue, d.cue, 0, 1),
     voice: numberIn(raw.voice, d.voice, 0, 1),
     muted: bool(raw.muted, d.muted),
   }
@@ -299,6 +302,7 @@ function sanitize(raw: unknown): Settings {
   const gap = fields(r.gap)
   const randomMute = fields(r.randomMute)
   const practice = fields(r.practice)
+  const cue = fields(r.cue)
   const sounds = fields(r.sounds)
   const voice = fields(r.voice)
   const visual = fields(r.visual)
@@ -322,6 +326,7 @@ function sanitize(raw: unknown): Settings {
     program: {
       enabled: bool(program.enabled, d.program.enabled),
       loop: bool(program.loop, d.program.loop),
+      countIn: bool(program.countIn, d.program.countIn),
     },
     gap: {
       enabled: bool(gap.enabled, d.gap.enabled),
@@ -346,12 +351,18 @@ function sanitize(raw: unknown): Settings {
       everyBars: intIn(practice.everyBars, d.practice.everyBars, 1, MAX_PRACTICE_EVERY_BARS),
       atTarget: oneOf(practice.atTarget, PRACTICE_AT_TARGET, d.practice.atTarget),
     },
+    cue: {
+      sectionChange: bool(cue.sectionChange, d.cue.sectionChange),
+      every: bool(cue.every, d.cue.every),
+      everyBars: intIn(cue.everyBars, d.cue.everyBars, 1, MAX_CUE_EVERY_BARS),
+    },
     sounds: {
       accent: soundId(sounds.accent, d.sounds.accent),
       // Settings saved before the sub-accent had its own sound played medium beats with the accent sound.
       medium: soundId(sounds.medium, soundId(sounds.accent, d.sounds.medium)),
       beat: soundId(sounds.beat, d.sounds.beat),
       sub: soundId(sounds.sub, d.sounds.sub),
+      cue: soundId(sounds.cue, d.sounds.cue),
     },
     voice: {
       enabled: bool(voice.enabled, d.voice.enabled),
@@ -495,6 +506,26 @@ function sectionSteps(section: Section, sectionIndex: number, repeats: number, t
   return steps
 }
 
+/** Id of the count-in step; never a program step id (those are `section:rep:part`). */
+export const COUNT_IN_ID = 'count-in'
+
+/** The count-in before `next`: one bar of its meter and tempo, beats only, reporting `next`'s origin (bar 0). */
+function countInStep(next: PlaySection): PlaySection {
+  const { beatsPerBar, beatUnit, beats, tempo, origin } = next
+  const step: PlaySection = {
+    id: COUNT_IN_ID,
+    name: 'Count-in',
+    beatsPerBar,
+    beatUnit,
+    beats,
+    subdivision: 'quarter',
+    bars: 1,
+    tempo,
+    countIn: true,
+  }
+  return origin ? { ...step, origin: { ...origin, barOffset: 0 } } : step
+}
+
 // Sections only change when the program is edited; tempo and mixer changes reuse the steps.
 const programStepsCache = new WeakMap<Section[], PlaySection[]>()
 
@@ -520,15 +551,19 @@ export function playbackSettings(settings: Settings): PlaybackSettings {
   if (settings.program.enabled && sections.length > 0) {
     // Playback starts at the beginning of the selected section (its first part, first repeat), else at the top.
     const steps = programSteps(sections)
-    const start = found ? steps.findIndex((step) => step.origin?.section === found.sectionIndex) : 0
-    return { ...rest, sections: steps, activeSection: Math.max(0, start) }
+    const start = Math.max(0, found ? steps.findIndex((step) => step.origin?.section === found.sectionIndex) : 0)
+    if (settings.program.countIn) {
+      // One bar of the start section's first part, beats only, right before it.
+      return { ...rest, sections: steps.toSpliced(start, 0, countInStep(steps[start])), activeSection: start }
+    }
+    return { ...rest, sections: steps, activeSection: start }
   }
   if (found) {
     return {
       ...rest,
       sections: sectionSteps(found.section, found.sectionIndex, 1, null),
       activeSection: 0,
-      program: { enabled: true, loop: true },
+      program: { enabled: true, loop: true, countIn: false },
     }
   }
   return {

@@ -159,6 +159,11 @@
     hashery "^1.5.1"
     keyv "^5.6.0"
 
+"@coderline/alphatab@1.9.0":
+  version "1.9.0"
+  resolved "https://registry.yarnpkg.com/@coderline/alphatab/-/alphatab-1.9.0.tgz#a0d2716da369cc8ad261842bb40594398a5fde89"
+  integrity sha512-pG/Um03DdiTW7i9KR+rPTRRnzIW5oJBWs67altBXtCkxGvUG1RuvkgRTZO3GIaOD2vATjcw+5OevMZl9I2/T+Q==
+
 "@eslint-community/eslint-utils@^4.8.0", "@eslint-community/eslint-utils@^4.9.1":
   version "4.10.1"
   resolved "https://registry.yarnpkg.com/@eslint-community/eslint-utils/-/eslint-utils-4.10.1.tgz#8911bd72b2c3640a543609e0400b8c4d2e7e7cb6"

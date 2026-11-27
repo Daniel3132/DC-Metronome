@@ -16,6 +16,8 @@ import './SoundPanel.css'
 
 const ROLES = SOUND_ROLES
 const ALL_ROLES: readonly SoundRole[] = SOUND_ROLES.map((r) => r.role)
+/** The roles a kit sets; the cue keeps its own sound. */
+const KIT_ROLES: readonly SoundRole[] = ALL_ROLES.filter((role) => role !== 'cue')
 
 type UseTarget = SoundRole | 'all'
 const USE_TARGETS: readonly { target: UseTarget; label: string; title: string }[] = [
@@ -23,6 +25,7 @@ const USE_TARGETS: readonly { target: UseTarget; label: string; title: string }[
   { target: 'medium', label: 'Sub-acc.', title: 'Use for sub-accents (the first beat of later groups, e.g. beat 4 of 3+3)' },
   { target: 'beat', label: 'Beat', title: 'Use for the other beats' },
   { target: 'sub', label: 'Sub', title: 'Use for subdivisions' },
+  { target: 'cue', label: 'Cue', title: 'Use for cues (beat 1 of a new section, or every N bars)' },
   { target: 'all', label: 'All', title: 'Use for every click' },
 ]
 
@@ -106,7 +109,7 @@ export function SoundPanel({ settings, onChange, metronome }: PanelProps) {
   )
 
   const { sounds } = settings
-  const uniform = ALL_ROLES.every((role) => sounds[role] === sounds.accent) ? sounds.accent : null
+  const uniform = KIT_ROLES.every((role) => sounds[role] === sounds.accent) ? sounds.accent : null
 
   function nameOf(id: SoundId): string {
     const customId = customIdOf(id)
@@ -136,7 +139,8 @@ export function SoundPanel({ settings, onChange, metronome }: PanelProps) {
   }
 
   function chooseKit(id: BuiltInSoundId) {
-    onChange((prev) => ({ ...prev, sounds: { accent: id, medium: id, beat: id, sub: id } }))
+    // The cue keeps its own sound: it is meant to stand out from the kit.
+    onChange((prev) => ({ ...prev, sounds: { ...prev.sounds, accent: id, medium: id, beat: id, sub: id } }))
     previewKit(id)
   }
 

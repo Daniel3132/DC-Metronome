@@ -1,5 +1,5 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
-import { getSubdivision, MAX_BPM, MAX_PRACTICE_EVERY_BARS, MAX_PRACTICE_STEP, MIN_BPM } from '../../core/constants'
+import { getSubdivision, MAX_BPM, MAX_CUE_EVERY_BARS, MAX_PRACTICE_EVERY_BARS, MAX_PRACTICE_STEP, MIN_BPM } from '../../core/constants'
 import {
   accentGroupings,
   beatsFromGrouping,
@@ -9,7 +9,7 @@ import {
   QUICK_SIGNATURES,
 } from '../../core/meter'
 import { defaultBeats, findPart, practiceAt, practiceWithStart, updateEditedPart, withBpm } from '../../core/settings'
-import type { BeatUnit, GapSettings, Part, PracticeSettings, PulseEvent, Settings, SubdivisionId } from '../../core/types'
+import type { BeatUnit, CueSettings, GapSettings, Part, PracticeSettings, PulseEvent, Settings, SubdivisionId } from '../../core/types'
 import { readItem, writeItem } from '../../state/uiPrefs'
 import type { SettingsUpdater } from '../../state/useSettings'
 import { ChevronDownIcon, TrendDownIcon, TrendUpIcon } from '../icons/icons'
@@ -127,7 +127,7 @@ function Cell({ label, aside, kind, children }: CellProps) {
  * the free rhythm when no section is selected.
  */
 export function QuickControls({ settings, onChange, getLevel, active, pulse, row: rowId, handle }: QuickControlsProps) {
-  const { gap, voice, practice, mixer } = settings
+  const { gap, voice, practice, mixer, cue } = settings
   const [collapsedRows, setCollapsedRows] = useState<RowId[]>(readCollapsedRows)
   const target = findPart(settings, settings.selected)
   const section = target?.part ?? settings.current
@@ -136,6 +136,7 @@ export function QuickControls({ settings, onChange, getLevel, active, pulse, row
     onChange((prev) => updateEditedPart(prev, fn))
   }
   const setGap = (patch: Partial<GapSettings>) => onChange((prev) => ({ ...prev, gap: { ...prev.gap, ...patch } }))
+  const setCue = (patch: Partial<CueSettings>) => onChange((prev) => ({ ...prev, cue: { ...prev.cue, ...patch } }))
   const setPractice = (patch: Partial<PracticeSettings>) =>
     onChange((prev) => ({ ...prev, practice: { ...prev.practice, ...patch } }))
 
@@ -237,6 +238,7 @@ export function QuickControls({ settings, onChange, getLevel, active, pulse, row
     signature,
     getSubdivision(section.subdivision).label,
     accentSummary,
+    ...(cue.every ? [`Cue every ${cue.everyBars}`] : []),
     gap.enabled ? `Rest bar ${gapValue}` : 'Rest bar off',
   ].join(' · ')
   const practiceSummary = [
@@ -298,7 +300,35 @@ export function QuickControls({ settings, onChange, getLevel, active, pulse, row
             />
           </Cell>
 
-          <Cell kind="accents" label="Accents">
+          <Cell
+            kind="accents"
+            label="Accents"
+            aside={
+              // Always shown (greyed out while off), so switching the cue on moves nothing.
+              <span
+                className="quick-controls__cell-aside quick-controls__cue"
+                title="Cue: beat 1 plays the cue sound every N bars (counted from the start of each section)"
+              >
+                <Toggle
+                  size="sm"
+                  label="Cue"
+                  checked={cue.every}
+                  onChange={(every) => setCue({ every })}
+                />
+                <Stepper
+                  label="Cue every (bars)"
+                  hideLabel
+                  size="sm"
+                  className="quick-controls__cue-bars"
+                  value={cue.everyBars}
+                  min={1}
+                  max={MAX_CUE_EVERY_BARS}
+                  disabled={!cue.every}
+                  onChange={(everyBars) => setCue({ everyBars })}
+                />
+              </span>
+            }
+          >
             <Segmented
               className="quick-controls__chips quick-controls__chips--accents"
               label="Accent pattern"

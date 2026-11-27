@@ -18,6 +18,7 @@ export const MAX_BEATS_PER_BAR = 16
 export const MAX_SECTION_BARS = 999
 export const MAX_GAP_BARS = 64
 export const MAX_PRACTICE_EVERY_BARS = 64
+export const MAX_CUE_EVERY_BARS = 64
 /** Master volume can be pushed past 100 % (a boost for quiet speakers), up to this gain. */
 export const MAX_MASTER_VOLUME = 1.25
 export const MAX_PRACTICE_STEP = 50
@@ -34,6 +35,7 @@ export const SOUND_ROLES: readonly { role: SoundRole; label: string; short: stri
   { role: 'medium', label: 'Sub-accent', short: 'Sub-acc.' },
   { role: 'beat', label: 'Beat', short: 'Beat' },
   { role: 'sub', label: 'Subdivision', short: 'Sub' },
+  { role: 'cue', label: 'Cue', short: 'Cue' },
 ]
 
 export const BEAT_LEVELS: readonly BeatLevel[] = ['accent', 'medium', 'normal', 'mute']

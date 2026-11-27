@@ -684,3 +684,9 @@
     border-color: Highlight;
   }
 }
+
+.program-panel__import-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--fs-xs);
+}

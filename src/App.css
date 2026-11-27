@@ -206,6 +206,8 @@
   align-items: center;
   gap: var(--space-2);
   /* Bleed to the screen edges on phones so the tabs scroll under the gutter instead of clipping. */
+  /* Always as tall as the tab row (tabs + their padding), so the active preset appearing never moves anything. */
+  min-height: calc(var(--touch-min) + 2 * var(--space-1));
   margin: 0 calc(-1 * var(--space-4));
   padding-right: var(--space-4);
   background: var(--bg);
@@ -302,21 +304,34 @@
   .app__tabbar {
     position: static;
     flex: none;
+    /* Tabs (26px) and the preset pill / save button (26px) share one fixed-height line. */
+    min-height: 28px;
     margin: 0;
     padding: 0 0 2px;
     /* No divider: the tab content starts right where it was. */
     border-bottom: 0;
   }
 
+  /* One line: the tabs scroll and the preset name truncates rather than wrapping the tabs onto a second line. */
   .app__tabs,
   .app__tabbar:has(.app__active-preset) .app__tabs {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     padding: 0;
-    overflow-x: visible;
+    overflow-x: auto;
   }
 
   .app__active-preset {
-    padding: 2px var(--space-3);
+    height: 26px;
+    padding: 0 var(--space-3);
+    align-items: center;
+    line-height: 1;
+  }
+
+  .ui-button.app__preset-save {
+    width: 26px;
+    min-width: 26px;
+    height: 26px;
+    min-height: 26px;
   }
 }
 

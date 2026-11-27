@@ -59,7 +59,7 @@ export function StatusBar({ pulse, startTime, sectionName, programEnabled, gap }
               <span className="status-bar__name">{sectionName || 'Section'}</span>
               <span className="status-bar__muted">
                 {' '}
-                · bar {pulse.sectionBar + 1}/{pulse.sectionBars}
+                · {pulse.countIn ? 'count-in' : `bar ${pulse.sectionBar + 1}/${pulse.sectionBars}`}
               </span>
             </>
           ) : (

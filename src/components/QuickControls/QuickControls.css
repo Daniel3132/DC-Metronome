@@ -227,6 +227,19 @@
   min-width: 0;
 }
 
+/* The cue switch and its bar count in the Accents header; when the cell is narrow they take a second header line. */
+.quick-controls__cell--accents .quick-controls__cell-head {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.quick-controls__cue {
+  flex: none;
+  gap: var(--space-1);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 /* Speed trainer progress: tempo now, bar of the step (or the target), and a thin bar under them. */
 .quick-controls__trainer {
   display: flex;

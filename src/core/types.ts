@@ -61,8 +61,9 @@ export type SoundId = BuiltInSoundId | `custom:${string}`
 /**
  * Which click a pulse uses. Each role has its own sound and mixer channel.
  * 'medium' is the sub-accent: the first beat of a later group (beat 4 of 6/8 as 3+3).
+ * 'cue' replaces the accent on beat 1 of a bar that starts a program section or an "every N bars" phrase (CueSettings).
  */
-export type SoundRole = 'accent' | 'medium' | 'beat' | 'sub'
+export type SoundRole = 'accent' | 'medium' | 'beat' | 'sub' | 'cue'
 
 export type VoicePackId = 'en-male' | 'en-female' | 'es-female'
 
@@ -129,6 +130,11 @@ export interface PlaySection extends Rhythm {
   tempo: number | null
   /** Missing for steps that are not part of the program (tests, the free rhythm). */
   origin?: PlayOrigin
+  /**
+   * The count-in before the program starts: plays once, is skipped when the program loops, does not count for the gap
+   * or speed trainers, and never sounds a cue.
+   */
+  countIn?: true
 }
 
 export interface ProgramSettings {
@@ -136,6 +142,18 @@ export interface ProgramSettings {
   enabled: boolean
   /** Restart at section 0 after the last section; when off playback stops at the end. */
   loop: boolean
+  /** Play one bar of the section playback starts at (beats only) before it, once per start. */
+  countIn: boolean
+}
+
+/** The cue: a sound of its own on beat 1 of the bars that start something (see SoundRole 'cue'). */
+export interface CueSettings {
+  /** In program mode, on the first bar of every section (even when the signature does not change). */
+  sectionChange: boolean
+  /** On every `everyBars`-th bar, counted from the start of the section (or of playback for the free rhythm). */
+  every: boolean
+  /** 1..MAX_CUE_EVERY_BARS. */
+  everyBars: number
 }
 
 /** Gap trainer: play `playBars` bars, then silence `muteBars` bars, repeat. */
@@ -182,6 +200,7 @@ export interface SoundSettings {
   medium: SoundId
   beat: SoundId
   sub: SoundId
+  cue: SoundId
 }
 
 export interface VoiceSettings {
@@ -205,6 +224,7 @@ export interface MixerSettings {
   medium: number
   beat: number
   sub: number
+  cue: number
   voice: number
   muted: boolean
 }
@@ -233,6 +253,7 @@ export interface Settings {
   gap: GapSettings
   randomMute: RandomMuteSettings
   practice: PracticeSettings
+  cue: CueSettings
   sounds: SoundSettings
   voice: VoiceSettings
   mixer: MixerSettings
@@ -276,6 +297,8 @@ export interface PulseEvent {
   sectionBar: number
   /** Bars the current section lasts while the sequence advances (program mode); null otherwise. */
   sectionBars: number | null
+  /** The pulse belongs to the count-in (then sectionIndex is the section that follows it). */
+  countIn: boolean
   /** Subdivision of the step this pulse belongs to. */
   subdivision: SubdivisionId
   /** 0-based bars since playback started. */
@@ -288,7 +311,7 @@ export interface PulseEvent {
   pulsesInBeat: number
   /** Configured level of the beat this pulse belongs to. */
   level: BeatLevel
-  /** Click this pulse would use (pulse 0: accent→'accent', medium→'medium', normal→'beat'; pulse > 0: 'sub'). Null when silent. */
+  /** Click this pulse would use (pulse 0: accent→'accent', medium→'medium', normal→'beat', a cue bar's beat 1→'cue'; pulse > 0: 'sub'). Null when silent. */
   role: SoundRole | null
   /** Whether the click should sound (false when silent, or when the voice replaces it). */
   click: boolean

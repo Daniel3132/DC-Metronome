@@ -50,7 +50,7 @@
   --level-mute: #2b313c;
 
   /* Height of a preset card (name and two lines of summary). */
-  --preset-card-h: 60px;
+  --preset-card-h: 62px;
 
   /* Radii */
   --radius-xs: 4px;
