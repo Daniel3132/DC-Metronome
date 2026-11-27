@@ -56,7 +56,7 @@ export function MasterVolume({ master, muted, onChange }: MasterVolumeProps) {
       />
       <div
         className="master-volume__control"
-        title="Stops at 100 %; drag further to boost up to 125 %"
+        title="Stops at 100 %; drag further to boost up to 125 %. Alt+click: back to 100 %"
         onPointerDownCapture={() => {
           dragging.current = true
           // The drag can end anywhere on the page.
@@ -77,6 +77,7 @@ export function MasterVolume({ master, muted, onChange }: MasterVolumeProps) {
           min={0}
           max={MAX_PERCENT}
           marks={[100]}
+          defaultValue={100}
           format={(v) => (muted ? 'Muted' : `${v}%`)}
           onChange={setVolume}
         />

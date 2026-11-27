@@ -1,5 +1,5 @@
 import { MAX_MASTER_VOLUME, SOUND_ROLES } from '../../core/constants'
-import { createDefaultSettings } from '../../core/settings'
+import { DEFAULT_MIXER } from '../../core/settings'
 import type { MixerSettings, SoundRole } from '../../core/types'
 import { SpeakerIcon, VolumeIcon, VolumeMuteIcon } from '../icons/icons'
 import { LevelMeter } from '../LevelMeter/LevelMeter'
@@ -11,8 +11,6 @@ import './MixerPanel.css'
 type GainKey = Exclude<keyof MixerSettings, 'muted'>
 
 const CLICK_CHANNELS: readonly { role: SoundRole; label: string }[] = SOUND_ROLES
-
-const DEFAULT_MIXER: MixerSettings = createDefaultSettings().mixer
 
 function isDefaultMixer(mixer: MixerSettings): boolean {
   return (Object.keys(DEFAULT_MIXER) as (keyof MixerSettings)[]).every((key) => mixer[key] === DEFAULT_MIXER[key])
@@ -40,7 +38,7 @@ export function MixerPanel({ settings, onChange, metronome }: PanelProps) {
   }
 
   function reset() {
-    onChange((prev) => ({ ...prev, mixer: createDefaultSettings().mixer }))
+    onChange((prev) => ({ ...prev, mixer: { ...DEFAULT_MIXER } }))
   }
 
   return (
@@ -64,6 +62,8 @@ export function MixerPanel({ settings, onChange, metronome }: PanelProps) {
             label="Master"
             value={mixer.master}
             max={MAX_MASTER_VOLUME}
+            // Alt+click: 100 %, like the volume bar on the stage.
+            defaultValue={1}
             onChange={(value) => setGain('master', value)}
             dimmed={mixer.muted}
             beside={<LevelMeter active={playing} getLevel={metronome.getLevel} />}
@@ -86,6 +86,7 @@ export function MixerPanel({ settings, onChange, metronome }: PanelProps) {
               key={role}
               label={label}
               value={mixer[role]}
+              defaultValue={DEFAULT_MIXER[role]}
               onChange={(value) => setGain(role, value)}
               dimmed={mixer.muted}
             >
@@ -101,6 +102,7 @@ export function MixerPanel({ settings, onChange, metronome }: PanelProps) {
           <VolumeFader
             label="Voice"
             value={mixer.voice}
+            defaultValue={DEFAULT_MIXER.voice}
             onChange={(value) => setGain('voice', value)}
             dimmed={mixer.muted}
           >

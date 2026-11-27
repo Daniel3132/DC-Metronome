@@ -1,6 +1,9 @@
 /* Faders stay side by side at every width; only this strip scrolls when a phone is too narrow. */
 .mixer-panel__scroller {
   --slider-length: 200px;
+  /* Containing block for the faders' screen-reader labels (absolute), so they are clipped here instead of
+     widening the page on phones. */
+  position: relative;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   /* Room for the fader caps' focus rings, which the scroll container would otherwise clip. */

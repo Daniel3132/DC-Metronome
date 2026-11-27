@@ -34,6 +34,12 @@ import {
   toCurrent,
   updateEditedPart,
   updatePart,
+  withDefaultProgram,
+  clearPicks,
+  loopRange,
+  pickAll,
+  pickRange,
+  togglePick,
 } from './settings'
 import type { Part, PulseEvent, Settings } from './types'
 
@@ -135,8 +141,11 @@ describe('clampTempoPercent', () => {
     [MAX_TEMPO_PERCENT, MAX_TEMPO_PERCENT],
     [10, MIN_TEMPO_PERCENT],
     [250, MAX_TEMPO_PERCENT],
-    [33.3, 33],
-    [66.6, 67],
+    [33.3, MIN_TEMPO_PERCENT],
+    [66.6, 65],
+    [72.4, 70],
+    [102, 100],
+    [103, 105],
     [Number.NaN, 100],
   ])('clampTempoPercent(%s) = %s', (input, expected) => {
     expect(clampTempoPercent(input)).toBe(expected)
@@ -296,6 +305,7 @@ describe('createDefaultSettings', () => {
         },
       ],
       selected: null,
+      loopSections: [],
       current: {
         id: CURRENT_PART_ID,
         beatsPerBar: 4,
@@ -591,9 +601,10 @@ describe('sanitizeSettings', () => {
     const settings: Settings = {
       version: 1,
       bpm: 300,
-      tempoPercent: 25,
+      tempoPercent: MIN_TEMPO_PERCENT,
       sections,
       selected: { section: sections[1].id, part: sections[1].parts[1].id },
+      loopSections: [sections[0].id, sections[1].id],
       current: toCurrent(createPart({ beatsPerBar: 5, beatUnit: 8, subdivision: 'swing' })),
       program: { enabled: true, loop: false, countIn: true },
       gap: { enabled: true, playBars: 64, muteBars: 64 },
@@ -802,5 +813,154 @@ describe('playbackSettings', () => {
     ])
     expect(bars[0].baseBpm).toBe(90)
     expect(bars[6].baseBpm).toBe(120)
+  })
+})
+
+describe('withDefaultProgram', () => {
+  const program = () => {
+    const base = createDefaultSettings()
+    const sections = [
+      createSection({ name: 'Verse', beatsPerBar: 3, beatUnit: 4, bars: 8, tempo: 90 }),
+      createSection({ name: 'Chorus', beatsPerBar: 7, beatUnit: 8, bars: 2 }),
+    ]
+    return {
+      ...base,
+      sections,
+      program: { enabled: true, loop: false, countIn: true },
+      current: toCurrent(createPart({ beatsPerBar: 5, beatUnit: 4, subdivision: 'eighths' })),
+    }
+  }
+
+  it('leaves one section of 4 bars in the signature of the selected section', () => {
+    const prev = program()
+    const chorus = prev.sections[1]
+    const next = withDefaultProgram({ ...prev, selected: { section: chorus.id, part: chorus.parts[0].id } })
+    expect(next.sections).toHaveLength(1)
+    const [section] = next.sections
+    expect(section.repeats).toBe(1)
+    expect(section.tempo).toBeNull()
+    expect(section.parts).toHaveLength(1)
+    expect(section.parts[0]).toMatchObject({ beatsPerBar: 7, beatUnit: 8, bars: 4, subdivision: 'quarter' })
+    expect(section.parts[0].beats).toEqual(defaultBeats(7, 8))
+    expect(next.selected).toBeNull()
+    expect(next.program).toEqual({ enabled: false, loop: true, countIn: false })
+    // The controls now edit the free rhythm, which takes the same signature.
+    expect(editedPart(next)).toMatchObject({ beatsPerBar: 7, beatUnit: 8 })
+  })
+
+  it('uses the free rhythm signature when nothing is selected and keeps the free rhythm as it is', () => {
+    const prev = program()
+    const next = withDefaultProgram(prev)
+    expect(next.sections[0].parts[0]).toMatchObject({ beatsPerBar: 5, beatUnit: 4, bars: 4 })
+    expect(next.current).toBe(prev.current)
+  })
+
+  it('keeps everything else', () => {
+    const prev = { ...program(), bpm: 150, tempoPercent: 75 }
+    const next = withDefaultProgram(prev)
+    expect(next.bpm).toBe(150)
+    expect(next.tempoPercent).toBe(75)
+    expect(next.mixer).toBe(prev.mixer)
+    expect(next.practice).toBe(prev.practice)
+  })
+})
+
+describe('picking several sections', () => {
+  const five = () => {
+    const sections = [3, 4, 5, 6, 7].map((beatsPerBar, i) =>
+      createSection({ name: `S${i + 1}`, beatsPerBar, bars: 2, repeats: 2, tempo: 100 + i * 10 }),
+    )
+    return { ...createDefaultSettings(), sections }
+  }
+  const ids = (s: Settings, indexes: number[]) => indexes.map((i) => s.sections[i].id)
+  const editing = (s: Settings) => findPart(s, s.selected)?.sectionIndex
+
+  it('Shift picks a range from the selected section, which stays edited', () => {
+    const start = selectSection(five(), 1)
+    const next = pickRange(start, 3)
+    expect(next.loopSections).toEqual(ids(next, [1, 2, 3]))
+    expect(editing(next)).toBe(1)
+    // Backwards from the same anchor.
+    const back = pickRange(next, 0)
+    expect(back.loopSections).toEqual(ids(back, [0, 1]))
+    expect(editing(back)).toBe(1)
+    // Back to the anchor alone: a plain selection.
+    expect(pickRange(back, 1).loopSections).toEqual([])
+  })
+
+  it('Shift with nothing selected just selects', () => {
+    const next = pickRange(five(), 2)
+    expect(editing(next)).toBe(2)
+    expect(next.loopSections).toEqual([])
+  })
+
+  it('Ctrl adds and removes single sections, in program order', () => {
+    let s = selectSection(five(), 3)
+    s = togglePick(s, 0)
+    expect(s.loopSections).toEqual(ids(s, [0, 3]))
+    expect(editing(s)).toBe(0)
+    s = togglePick(s, 4)
+    expect(s.loopSections).toEqual(ids(s, [0, 3, 4]))
+    s = togglePick(s, 4)
+    expect(s.loopSections).toEqual(ids(s, [0, 3]))
+    // Taking out the edited one moves editing to another pick.
+    s = togglePick(s, 0)
+    expect(s.loopSections).toEqual([])
+    expect(editing(s)).toBe(3)
+    // And the last one out selects none.
+    s = togglePick(s, 3)
+    expect(s.selected).toBeNull()
+  })
+
+  it('Ctrl+A picks all; selecting one section or clearing drops the picks', () => {
+    const all = pickAll(selectSection(five(), 2))
+    expect(loopRange(all)).toEqual([0, 1, 2, 3, 4])
+    expect(editing(all)).toBe(2)
+    expect(selectSection(all, 4).loopSections).toEqual([])
+    expect(selectPart(all, null).loopSections).toEqual([])
+    const cleared = clearPicks(all)
+    expect(cleared.loopSections).toEqual([])
+    expect(editing(cleared)).toBe(2)
+  })
+
+  it('moving the edited part inside a picked section keeps the picks', () => {
+    const s = pickRange(selectSection(five(), 0), 1)
+    const other = s.sections[1]
+    expect(selectPart(s, { section: other.id, part: other.parts[0].id }).loopSections).toEqual(s.loopSections)
+  })
+
+  it('plays only the picked sections, looping from the first, with their repeats and tempos in program mode', () => {
+    let s = togglePick(selectSection(five(), 1), 3)
+    s = { ...s, program: { enabled: true, loop: false, countIn: false } }
+    const play = playbackSettings(s)
+    expect(play.program).toEqual({ enabled: true, loop: true, countIn: false })
+    expect(play.activeSection).toBe(0)
+    expect(play.sections.map((step) => step.origin?.section)).toEqual([1, 1, 3, 3])
+    expect(play.sections.map((step) => step.tempo)).toEqual([110, 110, 130, 130])
+  })
+
+  it('plays one pass of each at the main tempo outside program mode', () => {
+    const s = pickRange(selectSection(five(), 2), 3)
+    const play = playbackSettings(s)
+    expect(play.program.loop).toBe(true)
+    expect(play.sections.map((step) => step.origin?.section)).toEqual([2, 3])
+    expect(play.sections.every((step) => step.tempo === null)).toBe(true)
+  })
+
+  it('puts the count-in before the first picked section in program mode', () => {
+    let s = pickRange(selectSection(five(), 2), 3)
+    s = { ...s, program: { enabled: true, loop: true, countIn: true } }
+    const play = playbackSettings(s)
+    expect(play.sections[0].countIn).toBe(true)
+    expect(play.sections[0].beatsPerBar).toBe(5)
+    expect(play.sections).toHaveLength(5)
+  })
+
+  it('ignores picks of deleted sections and drops stale ones when loading', () => {
+    const s = pickRange(selectSection(five(), 0), 1)
+    const without = { ...s, sections: s.sections.filter((x) => x.id !== s.sections[1].id) }
+    expect(loopRange(without)).toEqual([])
+    expect(sanitizeSettings(without).loopSections).toEqual([])
+    expect(sanitizeSettings(s).loopSections).toEqual(s.loopSections)
   })
 })

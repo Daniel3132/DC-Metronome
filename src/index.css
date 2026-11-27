@@ -47,6 +47,8 @@
   /* Sub-accents get their own hue (amber; with relative colors, opposite the accent below). */
   --level-medium: #f5a524;
   --level-soft: #5f6a7b;
+  /* Secondary color: the sub-accent hue (opposite the accent), for controls that must read apart from the accent. */
+  --secondary: var(--level-medium);
   --level-mute: #2b313c;
 
   /* Height of a preset card (name and two lines of summary). */

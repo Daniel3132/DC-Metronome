@@ -9,6 +9,8 @@ export interface VolumeFaderProps {
   value: number
   /** Highest gain (default 1, i.e. 100 %). */
   max?: number
+  /** Gain that Alt+click on the fader goes back to. */
+  defaultValue?: number
   onChange: (value: number) => void
   /** Rendered next to the fader track, bottom-aligned with it (e.g. a LevelMeter). */
   beside?: ReactNode
@@ -30,6 +32,7 @@ export function VolumeFader({
   label,
   value,
   max = 1,
+  defaultValue,
   onChange,
   beside,
   children,
@@ -50,6 +53,7 @@ export function VolumeFader({
           step={0.01}
           format={formatPercent}
           marks={MARKS}
+          defaultValue={defaultValue}
           onChange={onChange}
         />
         {beside}

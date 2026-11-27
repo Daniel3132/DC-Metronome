@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
-import { MAX_BPM, MIN_BPM } from '../../core/constants'
+import { MAX_BPM, MAX_TEMPO_PERCENT, MIN_BPM, MIN_TEMPO_PERCENT, TEMPO_PERCENT_STEP } from '../../core/constants'
 import { tempoMarking } from '../../core/meter'
-import { clampTempoPercent, playedBpm, withBpm } from '../../core/settings'
+import { clampTempoPercent, DEFAULT_BPM, DEFAULT_TEMPO_PERCENT, playedBpm, withBpm } from '../../core/settings'
 import type { Settings } from '../../core/types'
 import type { SettingsUpdater } from '../../state/useSettings'
 import { MinusIcon, PlusIcon, TrendDownIcon, TrendUpIcon } from '../icons/icons'
-import { Badge, Button, Segmented, Slider } from '../ui/ui'
+import { Badge, Button, Slider } from '../ui/ui'
 import './TempoControl.css'
 
 interface TempoControlProps {
@@ -17,15 +17,11 @@ interface TempoControlProps {
   playingBaseBpm: number | null
 }
 
-const PERCENT_PRESETS = [50, 75, 100, 125]
-
-/** The quick percentages, plus the current one when it is none of them (set with the keyboard), in order. */
-function percentChips(current: number) {
-  const values = PERCENT_PRESETS.includes(current)
-    ? PERCENT_PRESETS
-    : [...PERCENT_PRESETS, current].sort((a, b) => a - b)
-  return values.map((p) => ({ value: p, label: `${p}%` }))
-}
+/** A checkpoint at every step of the speed bar (50, 55 … 150). The CSS emphasizes every 25 % and 100 %. */
+const PERCENT_MARKS = Array.from(
+  { length: (MAX_TEMPO_PERCENT - MIN_TEMPO_PERCENT) / TEMPO_PERCENT_STEP + 1 },
+  (_, i) => MIN_TEMPO_PERCENT + i * TEMPO_PERCENT_STEP,
+)
 const SLIDER_MARKS = [60, 120, 180, 240]
 
 const HOLD_DELAY_MS = 400
@@ -287,6 +283,7 @@ export function TempoControl({ settings, onChange, playingBpm, playingBaseBpm }:
             min={MIN_BPM}
             max={MAX_BPM}
             marks={SLIDER_MARKS}
+            defaultValue={DEFAULT_BPM}
             format={(v) => `${v} BPM`}
             onChange={setBpm}
           />
@@ -295,14 +292,35 @@ export function TempoControl({ settings, onChange, playingBpm, playingBaseBpm }:
           </HoldButton>
         </div>
 
-        <Segmented
-          className="tempo-control__chips"
-          label="Tempo percentage"
-          size="sm"
-          value={tempoPercent}
-          options={percentChips(tempoPercent)}
-          onChange={setPercent}
-        />
+        {/* Speed: scales the tempo played, in steps of 5 % (resets to 100 % from its label). */}
+        <div className={`tempo-control__speed${tempoPercent !== 100 ? ' is-changed' : ''}`}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="tempo-control__speed-reset"
+            title={tempoPercent !== 100 ? 'Reset speed to 100 %' : 'Speed: scales the tempo played'}
+            aria-label="Reset speed to 100 %"
+            disabled={tempoPercent === 100}
+            onClick={() => setPercent(100)}
+          >
+            Speed
+          </Button>
+          <div className="tempo-control__speed-control" title="Plays the tempo at this percentage (steps of 5 %)">
+            <Slider
+              className="tempo-control__speed-slider"
+              label="Tempo percentage"
+              hideLabel
+              value={tempoPercent}
+              min={MIN_TEMPO_PERCENT}
+              max={MAX_TEMPO_PERCENT}
+              step={TEMPO_PERCENT_STEP}
+              marks={PERCENT_MARKS}
+              defaultValue={DEFAULT_TEMPO_PERCENT}
+              format={(v) => `${v}%`}
+              onChange={setPercent}
+            />
+          </div>
+        </div>
       </div>
     </section>
   )

@@ -66,6 +66,14 @@
     flex-direction: row;
     align-self: flex-end;
   }
+
+  /* Touch screens keep 16px in the stepper fields, so four steppers need about 360px; below that, 2 × 2. */
+  @container (max-width: 369px) {
+    /* Extra class: outranks the one-line rule further down. */
+    .quick-controls .quick-controls__steppers {
+      grid-template-columns: repeat(2, max-content);
+    }
+  }
 }
 
 /* ---- Dragging a row ---- */

@@ -77,6 +77,13 @@
   transition: border-color var(--dur-fast) var(--ease-out);
 }
 
+/* Phones: short, but tall enough to tap and to show the pad's level bar (its padding alone is 14px). */
+@media (max-width: 639px) {
+  .beat-grid__pad {
+    min-height: 40px;
+  }
+}
+
 @media (min-width: 640px) {
   .beat-grid__pad {
     min-height: 84px;

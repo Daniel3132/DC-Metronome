@@ -40,7 +40,7 @@ export function ProgramQuickEntry({ settings, onChange, onStatus }: ProgramQuick
     e?.preventDefault()
     if (!parsed) return
     const sections = toSections(parsed)
-    onChange((prev) => ({ ...prev, sections, selected: null, program: { ...prev.program, enabled: true } }))
+    onChange((prev) => ({ ...prev, sections, selected: null, loopSections: [], program: { ...prev.program, enabled: true } }))
     setText('')
     onStatus(`Program replaced: ${plural(sections.length, 'section')}.`)
   }

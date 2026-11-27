@@ -10,15 +10,20 @@ import {
 import {
   beatSeconds,
   clampBpm,
+  clearPicks,
   createPart,
   createSection,
   editedPart,
   effectiveBpm,
   findPart,
+  loopRange,
   makeId,
+  pickAll,
+  pickRange,
   sectionBars,
   selectPart,
   selectSection,
+  togglePick,
   withBpm,
 } from '../../core/settings'
 import { importSong, SONG_FILE_ACCEPT, type ImportedSong } from '../../core/import/importSong'
@@ -69,6 +74,18 @@ function meterOf(part: Part): string {
 function describeParts(section: Section): string {
   const parts = section.parts.map((p) => (p.bars === 1 ? meterOf(p) : `${p.bars} bars of ${meterOf(p)}`)).join(' then ')
   return section.repeats > 1 ? `${parts}, ${section.repeats} times` : parts
+}
+
+/** Section numbers as runs: [1, 2, 3, 5] → "1–3, 5". */
+function describeRuns(indexes: number[]): string {
+  const runs: string[] = []
+  for (let i = 0; i < indexes.length; i++) {
+    let j = i
+    while (j + 1 < indexes.length && indexes[j + 1] === indexes[j] + 1) j++
+    runs.push(j > i ? `${indexes[i] + 1}–${indexes[j] + 1}` : `${indexes[i] + 1}`)
+    i = j
+  }
+  return runs.join(', ')
 }
 
 function formatDuration(seconds: number): string {
@@ -160,6 +177,10 @@ export function ProgramPanel({
   // Program mode plays the sections; outside it the selected section loops (and the free rhythm plays when none is).
   const playingIndex = pulse && (program.enabled || selected) ? pulse.sectionIndex : -1
 
+  // Sections picked together (Ctrl/Shift+click): only those play, looping.
+  const loop = loopRange(settings)
+  const loopLabel = describeRuns(loop)
+
   const totalBars = sections.reduce((sum, s) => sum + sectionBars(s), 0)
   const totalSeconds = sections.reduce((sum, s) => sum + sectionSeconds(s, settings), 0)
   const canAdd = sections.length < MAX_SECTIONS
@@ -202,7 +223,7 @@ export function ProgramPanel({
   function clearAll() {
     if (sections.length === 0) return
     if (!window.confirm(`Delete all ${plural(sections.length, 'section')} of the program?`)) return
-    onChange((prev) => ({ ...prev, sections: [], selected: null }))
+    onChange((prev) => ({ ...prev, sections: [], selected: null, loopSections: [] }))
     focusRequest.current = { id: elId('program', 'add'), select: false }
     setStatus('Deleted all sections.')
   }
@@ -230,15 +251,41 @@ export function ProgramPanel({
     setStatus(`Added ${section.name}.`)
   }
 
-  /** Clicking a section selects it (the quick controls then edit it); clicking the selected one selects none. */
+  /**
+   * Clicking a section selects it (the quick controls then edit it); clicking the selected one selects none. While
+   * several are picked, a plain click selects that one alone.
+   */
   function toggleSelect(section: Section, index: number) {
-    const deselect = settings.selected?.section === section.id
+    const deselect = settings.selected?.section === section.id && loop.length === 0
     onChange((prev) => {
       const at = prev.sections.findIndex((s) => s.id === section.id)
       if (at < 0) return prev
+      if (loopRange(prev).length > 0) return selectSection(prev, at)
       return prev.selected?.section === section.id ? selectPart(prev, null) : selectSection(prev, at)
     })
     setStatus(deselect ? 'No section selected: the controls edit the free rhythm.' : `Editing ${sectionLabel(section, index)}.`)
+  }
+
+  /** Announces what plays after the picks changed. */
+  function announcePicks(next: Settings) {
+    const picked = loopRange(next)
+    const edited = findPart(next, next.selected)
+    if (picked.length > 0) setStatus(`Looping sections ${describeRuns(picked)}.`)
+    else if (edited) setStatus(`Editing ${sectionLabel(edited.section, edited.sectionIndex)}.`)
+    else setStatus('No section selected: the controls edit the free rhythm.')
+  }
+
+  /** Ctrl+click, Shift+click, Shift+arrows and Ctrl+A: pick several sections to play only those, looping. */
+  function changePicks(pick: (prev: Settings) => Settings, focusIndex?: number) {
+    announcePicks(pick(settings))
+    onChange(pick)
+    const focus = focusIndex === undefined ? undefined : sections[focusIndex]
+    if (focus) focusRequest.current = { id: elId(focus.id, 'cell'), select: false }
+  }
+
+  function playAll() {
+    onChange(clearPicks)
+    setStatus('Playing every section again.')
   }
 
   function deselect() {
@@ -307,7 +354,7 @@ export function ProgramPanel({
     const sections = toSections(parsed)
     const tempo = sections[0]?.tempo
     const base = tempo != null ? withBpm(settings, tempo) : settings
-    const next: Settings = { ...base, sections, selected: null, program: { ...base.program, enabled: true } }
+    const next: Settings = { ...base, sections, selected: null, loopSections: [], program: { ...base.program, enabled: true } }
     onChange(() => next)
     presetActions.add({ id: makeId(), name, settings: next, createdAt: Date.now() })
     setImported(null)
@@ -342,6 +389,7 @@ export function ProgramPanel({
         <>
           <span className="tabular">{summary}</span>
           {!program.enabled && <span> · off</span>}
+          {loop.length > 0 && <span className="program-panel__loop-note"> · looping {loopLabel}</span>}
           {settings.practice.enabled && (
             <span
               className="program-panel__warn"
@@ -423,6 +471,18 @@ export function ProgramPanel({
                 if (file) void readSongFile(file)
               }}
             />
+            {loop.length > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="program-panel__loop-clear"
+                icon={<XIcon size={14} />}
+                title="Play every section again (Esc on a section)"
+                onClick={playAll}
+              >
+                Loop {loopLabel}
+              </Button>
+            )}
             <Button
               size="sm"
               variant="ghost"
@@ -443,11 +503,13 @@ export function ProgramPanel({
 
           <ol
             className={['program-panel__matrix', sectionDrag.from !== null && 'is-sorting'].filter(Boolean).join(' ')}
-            aria-label="Sections (drag to reorder, Alt+arrow keys move the focused one)"
+            aria-label="Sections (drag to reorder, Alt+arrow keys move the focused one; Ctrl+click, Shift+click or Shift+arrow keys pick several to loop, Ctrl+A picks all, Escape plays all again)"
+            aria-multiselectable="true"
           >
             {sections.map((section, index) => {
               const label = sectionLabel(section, index)
               const isActive = index === editIndex
+              const isPicked = loop.includes(index)
               const isPlaying = index === playingIndex
               const total = sectionBars(section)
               const bar =
@@ -463,23 +525,60 @@ export function ProgramPanel({
                   <button
                     type="button"
                     id={elId(section.id, 'cell')}
-                    className={['program-panel__cell', isActive && 'is-active', isPlaying && 'is-playing']
+                    className={[
+                      'program-panel__cell',
+                      isActive && 'is-active',
+                      isPicked && 'is-picked',
+                      isPlaying && 'is-playing',
+                    ]
                       .filter(Boolean)
                       .join(' ')}
-                    aria-pressed={isActive}
+                    aria-pressed={isActive || isPicked}
                     aria-current={isPlaying ? 'step' : undefined}
                     aria-label={`${index + 1}. ${label}: ${describeParts(section)}, ${plural(total, 'bar')}${
                       section.tempo !== null ? `, ${section.tempo} BPM` : ''
-                    }${isPlaying ? ', playing' : ''}`}
-                    title={isActive ? 'Click to stop editing this section' : 'Click to edit, drag to reorder'}
-                    onClick={() => {
-                      if (!sectionDrag.consumeClick()) toggleSelect(section, index)
+                    }${isPicked ? ', in the loop' : ''}${isPlaying ? ', playing' : ''}`}
+                    title={
+                      (isActive && loop.length === 0 ? 'Click to stop editing this section' : 'Click to edit, drag to reorder') +
+                      '. Ctrl+click or Shift+click: pick several to loop them'
+                    }
+                    onMouseDown={(e) => {
+                      // Shift+click would otherwise select the text of the cells in between.
+                      if (e.shiftKey) e.preventDefault()
+                    }}
+                    onClick={(e) => {
+                      if (sectionDrag.consumeClick()) return
+                      if (e.ctrlKey || e.metaKey) changePicks((prev) => togglePick(prev, index))
+                      else if (e.shiftKey) changePicks((prev) => pickRange(prev, index))
+                      else toggleSelect(section, index)
                     }}
                     onKeyDown={(e) => {
                       const delta = moveKey(e)
-                      if (delta === 0) return
-                      e.preventDefault()
-                      stepSection(index, delta)
+                      if (delta !== 0) {
+                        e.preventDefault()
+                        stepSection(index, delta)
+                        return
+                      }
+                      const arrow =
+                        e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : 0
+                      if (e.shiftKey && arrow !== 0) {
+                        // Extend the picks from the selected section to the neighbour, which takes the focus.
+                        e.preventDefault()
+                        const to = index + arrow
+                        if (to >= 0 && to < sections.length) changePicks((prev) => pickRange(prev, to), to)
+                        return
+                      }
+                      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+                        e.preventDefault()
+                        changePicks(pickAll)
+                        return
+                      }
+                      if (e.key === 'Escape' && loop.length > 0) {
+                        // Before the global Escape (which closes the tab).
+                        e.preventDefault()
+                        e.stopPropagation()
+                        playAll()
+                      }
                     }}
                   >
                     <span className="program-panel__cell-line program-panel__cell-line--head" aria-hidden="true">
