@@ -38,5 +38,5 @@ export function applyPreset(prev: Settings, preset: Settings): Settings {
   if (loaded.program.enabled) return next
   const { beatsPerBar, beatUnit, beats, subdivision } = loaded.current
   const section = createSection({ name: 'Section 1', beatsPerBar, beatUnit, beats: [...beats], subdivision })
-  return { ...next, sections: [section], selected: null }
+  return { ...next, sections: [section], selected: null, loopSections: [] }
 }

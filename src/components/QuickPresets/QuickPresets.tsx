@@ -1,5 +1,5 @@
 import { useId, useState, type FormEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
-import { makeId } from '../../core/settings'
+import { makeId, withDefaultProgram } from '../../core/settings'
 import { applyPreset, describeSettings, suggestedName } from '../../state/presetSummary'
 import type { Preset } from '../../state/storage'
 import { presetActions, usePresets } from '../../state/usePresets'
@@ -13,7 +13,8 @@ const NAME_MAX_LENGTH = 60
 
 /**
  * Presets at a glance in the Quick tab: one tap loads a saved preset (with its program), and the current setup can be
- * saved under a name. Tapping the highlighted preset again unselects it (the settings stay as they are). The x in a
+ * saved under a name. Tapping the highlighted preset again unselects it and resets the
+ * program to one section of 4 bars in the current signature (the other settings stay as they are). The x in a
  * card's corner deletes it; dragging a card reorders them. Renaming, import
  * and export stay in the Presets tab.
  */
@@ -79,11 +80,12 @@ export function QuickPresets({
     setStatus(`Loaded "${preset.name}".`)
   }
 
-  /** A tap on the highlighted preset unselects it instead of loading it again. */
+  /** A tap on the highlighted preset unselects it (and resets the program it brought) instead of loading it again. */
   function unselect(preset: Preset): boolean {
     if (active !== preset.id) return false
+    onChange(withDefaultProgram)
     presetActions.setActive(null)
-    setStatus(`Unselected "${preset.name}".`)
+    setStatus(`Unselected "${preset.name}". The program is back to one section.`)
     return true
   }
 

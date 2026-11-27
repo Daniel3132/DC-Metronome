@@ -17,6 +17,7 @@ import {
   MAX_TEMPO_PERCENT,
   MIN_BPM,
   MIN_TEMPO_PERCENT,
+  TEMPO_PERCENT_STEP,
   SUBDIVISIONS,
   VOICE_PACKS,
 } from './constants'
@@ -31,6 +32,7 @@ import type {
   PlaySection,
   PracticeAtTarget,
   PracticeSettings,
+  ProgramSettings,
   Rhythm,
   Section,
   Settings,
@@ -93,10 +95,10 @@ export function withBpm(prev: Settings, bpm: number): Settings {
   return next === prev.bpm && practice === prev.practice ? prev : { ...prev, bpm: next, practice }
 }
 
-/** Clamp and round a tempo percentage to an integer in MIN_TEMPO_PERCENT..MAX_TEMPO_PERCENT (NaN → 100). */
+/** Round a tempo percentage to a multiple of TEMPO_PERCENT_STEP in MIN_TEMPO_PERCENT..MAX_TEMPO_PERCENT (NaN → 100). */
 export function clampTempoPercent(percent: number): number {
   if (Number.isNaN(percent)) return DEFAULT_TEMPO_PERCENT
-  return clamp(Math.round(percent), MIN_TEMPO_PERCENT, MAX_TEMPO_PERCENT)
+  return clamp(Math.round(percent / TEMPO_PERCENT_STEP) * TEMPO_PERCENT_STEP, MIN_TEMPO_PERCENT, MAX_TEMPO_PERCENT)
 }
 
 /** base × percent / 100, clamped to MIN_BPM..MAX_BPM. Not rounded (may be fractional). */
@@ -176,6 +178,39 @@ export function createPlaySection(partial: Partial<Omit<PlaySection, 'id'>> = {}
   return partial.origin ? { ...step, origin: partial.origin } : step
 }
 
+/** Factory volumes (what the mixer's Reset and Alt+click on a fader go back to). */
+export const DEFAULT_MIXER: Readonly<MixerSettings> = {
+  master: 0.8,
+  accent: 1,
+  medium: 0.8,
+  beat: 0.85,
+  sub: 0.6,
+  cue: 1,
+  voice: 1,
+  muted: false,
+}
+
+/** Program settings of a fresh start: program mode off, looping, no count-in. */
+const DEFAULT_PROGRAM: ProgramSettings = { enabled: false, loop: true, countIn: false }
+
+/**
+ * The program back to its default: one section of 4 bars in the signature being edited (default accents, quarter
+ * subdivision), nothing selected, program mode off. The free rhythm keeps its accents unless its signature differs.
+ */
+export function withDefaultProgram(prev: Settings): Settings {
+  const { beatsPerBar, beatUnit } = editedPart(prev)
+  const section = createSection({ beatsPerBar, beatUnit })
+  const sameSignature = prev.current.beatsPerBar === beatsPerBar && prev.current.beatUnit === beatUnit
+  return {
+    ...prev,
+    sections: [section],
+    selected: null,
+    loopSections: [],
+    current: sameSignature ? prev.current : toCurrent(section.parts[0]),
+    program: { ...DEFAULT_PROGRAM },
+  }
+}
+
 /** Factory defaults: 120 BPM, 100 %, one section of 4 bars of 4/4 (none selected), gap trainer 2 played : 1 silent (disabled), random mute 25 % (disabled), practice 80→120 (×1.5) +5 every 2 bars 'hold' (disabled), all sounds 'click', voice en-male beats only with clicks, no section announcements (disabled), mixer master 0.8 / accent 1 / sub-accent 0.8 / beat 0.85 / sub 0.6 / voice 1, flash off. */
 export function createDefaultSettings(): Settings {
   const section = createSection()
@@ -185,15 +220,16 @@ export function createDefaultSettings(): Settings {
     tempoPercent: DEFAULT_TEMPO_PERCENT,
     sections: [section],
     selected: null,
+    loopSections: [],
     current: toCurrent(section.parts[0]),
-    program: { enabled: false, loop: true, countIn: false },
+    program: { ...DEFAULT_PROGRAM },
     gap: { enabled: false, playBars: 2, muteBars: 1 },
     randomMute: { enabled: false, percent: 25 },
     practice: { enabled: false, startBpm: 80, targetBpm: DEFAULT_BPM, targetRatio: 1.5, stepBpm: 5, everyBars: 2, atTarget: 'hold' },
     cue: { sectionChange: false, every: false, everyBars: 4 },
     sounds: { accent: 'click', medium: 'click', beat: 'click', sub: 'click', cue: 'bell' },
     voice: { enabled: false, pack: 'en-male', subdivisions: false, clicks: true, announceSections: false },
-    mixer: { master: 0.8, accent: 1, medium: 0.8, beat: 0.85, sub: 0.6, cue: 1, voice: 1, muted: false },
+    mixer: { ...DEFAULT_MIXER },
     visual: { flash: false },
   }
 }
@@ -322,6 +358,7 @@ function sanitize(raw: unknown): Settings {
     tempoPercent: isNumber(r.tempoPercent) ? clampTempoPercent(r.tempoPercent) : d.tempoPercent,
     sections,
     selected: selected && { section: selected.section.id, part: selected.part.id },
+    loopSections: sanitizeLoopSections(r.loopSections, sections, selected?.section.id ?? null),
     current,
     program: {
       enabled: bool(program.enabled, d.program.enabled),
@@ -385,6 +422,14 @@ function sanitize(raw: unknown): Settings {
  * unknown sound ids fall back to 'click' (ids starting with 'custom:' are kept); unknown subdivision / voice
  * pack / atTarget values fall back to defaults; mixer gains are clamped to 0..1. Never throws.
  */
+/** Stored loop picks: known ids in program order, kept only when two or more remain and the selected one is among them. */
+function sanitizeLoopSections(raw: unknown, sections: Section[], selectedId: string | null): string[] {
+  if (!Array.isArray(raw) || selectedId === null) return []
+  const picked = new Set(raw.filter((id): id is string => typeof id === 'string'))
+  const ids = sections.filter((s) => picked.has(s.id)).map((s) => s.id)
+  return ids.length >= 2 && ids.includes(selectedId) ? ids : []
+}
+
 export function sanitizeSettings(raw: unknown): Settings {
   try {
     return sanitize(raw)
@@ -451,12 +496,76 @@ export function updateEditedPart(settings: Settings, update: (part: Part) => Par
   return updatePart(settings, findPart(settings, settings.selected) ? settings.selected : null, update)
 }
 
-/** Select a part (null: none, so the free rhythm is edited and played). A ref that points at nothing selects none. */
+/**
+ * Select a part (null: none, so the free rhythm is edited and played). A ref that points at nothing selects none.
+ * Sections picked together stay picked while the selection moves among them; selecting anything else drops them.
+ */
 export function selectPart(settings: Settings, ref: PartRef | null): Settings {
   const found = findPart(settings, ref)
   const selected = found && { section: found.section.id, part: found.part.id }
   const same = selected?.section === settings.selected?.section && selected?.part === settings.selected?.part
-  return same ? settings : { ...settings, selected }
+  if (same) return settings
+  const keepPicks = selected !== null && settings.loopSections.includes(selected.section)
+  return { ...settings, selected, loopSections: keepPicks ? settings.loopSections : [] }
+}
+
+/** Indexes of the sections that loop together (two or more, in program order), else []. */
+export function loopRange(settings: Pick<Settings, 'sections' | 'loopSections'>): number[] {
+  if (settings.loopSections.length < 2) return []
+  const picked = new Set(settings.loopSections)
+  const indexes = settings.sections.flatMap((s, i) => (picked.has(s.id) ? [i] : []))
+  return indexes.length >= 2 ? indexes : []
+}
+
+/** The sections at `indexes` picked, section `editIndex` (else the first of them) selected; one pick is a plain selection. */
+function withPicks(settings: Settings, indexes: number[], editIndex: number | null): Settings {
+  const sorted = [...new Set(indexes)].filter((i) => settings.sections[i] !== undefined).sort((a, b) => a - b)
+  if (sorted.length === 0) return selectPart(settings, null)
+  const edit = editIndex !== null && sorted.includes(editIndex) ? editIndex : sorted[0]
+  const selected = selectSection(settings, edit)
+  return { ...selected, loopSections: sorted.length >= 2 ? sorted.map((i) => settings.sections[i].id) : [] }
+}
+
+/** The sections picked now: the loop picks, else the selected section alone, else none. */
+function pickedIndexes(settings: Settings): number[] {
+  const range = loopRange(settings)
+  if (range.length > 0) return range
+  const at = findPart(settings, settings.selected)?.sectionIndex
+  return at === undefined ? [] : [at]
+}
+
+/** Ctrl+click: add section `index` to the picks (it becomes the one edited), or take it out. */
+export function togglePick(settings: Settings, index: number): Settings {
+  if (!settings.sections[index]) return settings
+  const picked = pickedIndexes(settings)
+  if (!picked.includes(index)) return withPicks(settings, [...picked, index], index)
+  const rest = picked.filter((i) => i !== index)
+  const editing = findPart(settings, settings.selected)?.sectionIndex ?? null
+  return withPicks(settings, rest, editing === index ? null : editing)
+}
+
+/**
+ * Shift+click (or Shift+arrow): pick every section from the selected one (the anchor, which stays edited) to section
+ * `index`. With nothing selected, `index` alone is selected.
+ */
+export function pickRange(settings: Settings, index: number): Settings {
+  if (!settings.sections[index]) return settings
+  const anchor = findPart(settings, settings.selected)?.sectionIndex
+  if (anchor === undefined) return withPicks(settings, [index], index)
+  const from = Math.min(anchor, index)
+  const to = Math.max(anchor, index)
+  return withPicks(settings, Array.from({ length: to - from + 1 }, (_, i) => from + i), anchor)
+}
+
+/** Ctrl+A: every section picked (the selected one stays edited, else the first). */
+export function pickAll(settings: Settings): Settings {
+  const editing = findPart(settings, settings.selected)?.sectionIndex ?? 0
+  return withPicks(settings, settings.sections.map((_, i) => i), editing)
+}
+
+/** Drop the loop picks; the selected section stays selected. */
+export function clearPicks(settings: Settings): Settings {
+  return settings.loopSections.length === 0 ? settings : { ...settings, loopSections: [] }
 }
 
 /**
@@ -466,8 +575,10 @@ export function selectPart(settings: Settings, ref: PartRef | null): Settings {
 export function selectSection(settings: Settings, index: number | null): Settings {
   const section = index === null ? undefined : settings.sections[index]
   if (!section) return selectPart(settings, null)
-  if (settings.selected?.section === section.id && findPart(settings, settings.selected)) return settings
-  return selectPart(settings, { section: section.id, part: section.parts[0].id })
+  // Selecting one section on its own ends picking several.
+  const single = clearPicks(settings)
+  if (single.selected?.section === section.id && findPart(single, single.selected)) return single
+  return selectPart(single, { section: section.id, part: section.parts[0].id })
 }
 
 /** Bars of one pass through a section's parts. */
@@ -528,6 +639,27 @@ function countInStep(next: PlaySection): PlaySection {
 
 // Sections only change when the program is edited; tempo and mixer changes reuse the steps.
 const programStepsCache = new WeakMap<Section[], PlaySection[]>()
+const loopStepsCache = new WeakMap<Section[], Map<string, PlaySection[]>>()
+
+/** The steps of the sections at `indexes`: as in the program (repeats, tempos), or one pass each at the main tempo. */
+function loopSteps(sections: Section[], indexes: number[], asProgram: boolean): PlaySection[] {
+  const key = `${asProgram ? 'program' : 'free'}:${indexes.join(',')}`
+  let bySelection = loopStepsCache.get(sections)
+  if (!bySelection) {
+    bySelection = new Map()
+    loopStepsCache.set(sections, bySelection)
+  }
+  let steps = bySelection.get(key)
+  if (!steps) {
+    steps = indexes.flatMap((i) =>
+      asProgram
+        ? sectionSteps(sections[i], i, sections[i].repeats, sections[i].tempo)
+        : sectionSteps(sections[i], i, 1, null),
+    )
+    bySelection.set(key, steps)
+  }
+  return steps
+}
 
 function programSteps(sections: Section[]): PlaySection[] {
   let steps = programStepsCache.get(sections)
@@ -545,8 +677,21 @@ function programSteps(sections: Section[]): PlaySection[] {
  * loops at the main tempo (one pass, advanced like a looping program), or the free rhythm loops when none is selected.
  */
 export function playbackSettings(settings: Settings): PlaybackSettings {
-  const { sections, selected, current, ...rest } = settings
+  const { sections, selected, loopSections, current, ...rest } = settings
   const found = findPart(settings, selected)
+  const range = loopRange({ sections, loopSections })
+  if (range.length > 0) {
+    // Sections picked together: only those play, in program order, over and over from the first. In program mode with
+    // their repeats and tempos (and the count-in); otherwise one pass each at the main tempo, as one selected section.
+    const steps = loopSteps(sections, range, settings.program.enabled)
+    const countIn = settings.program.enabled && settings.program.countIn
+    return {
+      ...rest,
+      sections: countIn ? [countInStep(steps[0]), ...steps] : steps,
+      activeSection: 0,
+      program: { enabled: true, loop: true, countIn },
+    }
+  }
   // An empty program has nothing to play: the free rhythm plays instead, as outside program mode.
   if (settings.program.enabled && sections.length > 0) {
     // Playback starts at the beginning of the selected section (its first part, first repeat), else at the top.

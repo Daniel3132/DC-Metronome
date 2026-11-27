@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { VOICE_PACKS } from '../../core/constants'
+import { DEFAULT_MIXER } from '../../core/settings'
 import type { VoicePackId, VoiceSettings, VoiceWord } from '../../core/types'
 import { StopIcon, VoiceIcon } from '../icons/icons'
 import type { PanelProps } from '../panelTypes'
@@ -131,6 +132,7 @@ export function VoicePanel({ settings, onChange, metronome }: PanelProps) {
       <Slider
         label="Voice volume"
         value={settings.mixer.voice}
+        defaultValue={DEFAULT_MIXER.voice}
         min={0}
         max={1}
         step={0.01}

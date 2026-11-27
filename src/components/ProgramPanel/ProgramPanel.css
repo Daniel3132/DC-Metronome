@@ -70,6 +70,25 @@
   border-color: var(--accent-border);
 }
 
+/* Picked to loop with others (Ctrl/Shift+click): the secondary color; the edited one keeps the accent. */
+.program-panel__cell.is-picked:not(.is-active) {
+  background: color-mix(in srgb, var(--secondary) 10%, transparent);
+  border-color: color-mix(in srgb, var(--secondary) 55%, transparent);
+}
+
+.program-panel__cell.is-picked .program-panel__index {
+  box-shadow: 0 0 0 2px var(--secondary);
+}
+
+.program-panel__loop-note {
+  color: var(--secondary);
+}
+
+.ui-button.program-panel__loop-clear {
+  border: 1px solid color-mix(in srgb, var(--secondary) 55%, transparent);
+  color: var(--secondary);
+}
+
 .program-panel__cell.is-playing {
   border-color: var(--accent);
   box-shadow: var(--shadow-glow);

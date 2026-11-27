@@ -238,7 +238,7 @@ export interface Settings {
   version: 1
   /** Global tempo in BPM, MIN_BPM..MAX_BPM (integer). */
   bpm: number
-  /** Scales whatever tempo is in effect, MIN_TEMPO_PERCENT..MAX_TEMPO_PERCENT (integer). */
+  /** Scales whatever tempo is in effect, MIN_TEMPO_PERCENT..MAX_TEMPO_PERCENT in steps of TEMPO_PERCENT_STEP. */
   tempoPercent: number
   /** The program, in play order; may be empty (then the free rhythm plays even in program mode). */
   sections: Section[]
@@ -247,6 +247,11 @@ export interface Settings {
    * mode the selected section loops; with nothing selected `current` plays.
    */
   selected: PartRef | null
+  /**
+   * Ids of the sections picked together (Ctrl/Shift+click), in program order, the selected one among them. With two
+   * or more, only those sections play, looping. Empty otherwise (one section is just `selected`).
+   */
+  loopSections: string[]
   /** The free rhythm, id CURRENT_PART_ID: edited and played while no section is selected. */
   current: Part
   program: ProgramSettings
@@ -265,7 +270,7 @@ export interface Settings {
  * playbackSettings). `activeSection` is the step that loops outside program mode, and the step playback starts at in
  * program mode.
  */
-export interface PlaybackSettings extends Omit<Settings, 'sections' | 'selected' | 'current'> {
+export interface PlaybackSettings extends Omit<Settings, 'sections' | 'selected' | 'loopSections' | 'current'> {
   sections: PlaySection[]
   activeSection: number
 }

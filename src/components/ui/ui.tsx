@@ -20,6 +20,7 @@ import {
   type ComponentPropsWithRef,
   type CSSProperties,
   type KeyboardEvent,
+  type MouseEvent,
   type PointerEvent,
   type ReactNode,
 } from 'react'
@@ -139,6 +140,8 @@ export interface SliderProps {
   orientation?: 'horizontal' | 'vertical'
   /** Values to draw tick marks at (decorative). */
   marks?: number[]
+  /** Alt+click on the slider puts it back to this value (and says so in its tooltip). */
+  defaultValue?: number
   /** Track length of a vertical slider: px number or CSS length (default 180px, or the --slider-length variable). */
   length?: number | string
   id?: string
@@ -158,6 +161,7 @@ export function Slider({
   disabled = false,
   orientation = 'horizontal',
   marks,
+  defaultValue,
   length,
   id,
   className,
@@ -183,6 +187,18 @@ export function Slider({
   ) : null
   const visibleMarks = (marks ?? []).filter((m) => m >= min && m <= max)
 
+  const resettable = defaultValue !== undefined && !disabled
+  /** Alt+click: back to the default value. Taken on pointerdown, so the thumb never jumps to the pointer first. */
+  function resetOnAlt(e: PointerEvent<HTMLInputElement>) {
+    if (!resettable || !e.altKey || e.button !== 0) return
+    e.preventDefault()
+    if (value !== defaultValue) onChange(defaultValue)
+  }
+  /** The mousedown after an Alt pointerdown would still start a drag in some browsers. */
+  function blockAltDrag(e: MouseEvent<HTMLInputElement>) {
+    if (resettable && e.altKey) e.preventDefault()
+  }
+
   const control = (
     <div className="ui-slider-control">
       <input
@@ -196,7 +212,10 @@ export function Slider({
         disabled={disabled}
         aria-valuetext={text}
         aria-orientation={vertical ? 'vertical' : undefined}
+        title={defaultValue !== undefined ? `Alt+click: back to ${format ? format(defaultValue) : defaultValue}` : undefined}
         onChange={(e) => onChange(Number(e.currentTarget.value))}
+        onPointerDown={resetOnAlt}
+        onMouseDown={blockAltDrag}
       />
       {visibleMarks.length > 0 && (
         <div className="ui-slider-marks" aria-hidden="true">

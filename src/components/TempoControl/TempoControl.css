@@ -144,8 +144,121 @@
   text-overflow: ellipsis;
 }
 
-/* The quick percentages, centered under the slider. */
-.tempo-control__chips {
+/*
+ * Speed percentage: narrower and slimmer than the tempo slider above, in the secondary color, with a checkpoint at
+ * every 5 % (taller every 25 %, strongest at 100 %).
+ */
+.tempo-control__speed {
+  --_speed: var(--secondary);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-1);
   align-self: center;
-  max-width: 100%;
+  width: min(100%, 300px);
+  min-width: 0;
+}
+
+.tempo-control__speed-control {
+  min-width: 0;
+}
+
+.ui-button.tempo-control__speed-reset {
+  min-width: 0;
+  padding: 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Disabled at 100 % (nothing to reset), but it still reads as the bar's label. */
+.ui-button.tempo-control__speed-reset:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.tempo-control__speed.is-changed .tempo-control__speed-reset {
+  color: var(--_speed);
+}
+
+/* Slim track and a small square-ish thumb, so it reads apart from the round tempo thumb. */
+.ui-slider.tempo-control__speed-slider {
+  --_thumb: 14px;
+  --_track: 4px;
+  column-gap: var(--space-2);
+}
+
+/* As tall as the small chips it replaced, so the stage keeps its height. */
+.tempo-control__speed-slider .ui-slider-input {
+  height: var(--control-sm);
+}
+
+.tempo-control__speed-slider .ui-slider-input::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, var(--_speed) var(--fill, 0%), var(--surface-3) var(--fill, 0%));
+}
+
+.tempo-control__speed-slider .ui-slider-input::-moz-range-progress {
+  background: var(--_speed);
+}
+
+.tempo-control__speed-slider .ui-slider-input::-webkit-slider-thumb {
+  background: var(--_speed);
+  border: 2px solid var(--surface-1);
+  border-radius: var(--radius-xs);
+  box-shadow: 0 0 0 1px var(--_speed);
+}
+
+.tempo-control__speed-slider .ui-slider-input::-moz-range-thumb {
+  background: var(--_speed);
+  border: 2px solid var(--surface-1);
+  border-radius: var(--radius-xs);
+  box-shadow: 0 0 0 1px var(--_speed);
+}
+
+.tempo-control__speed-slider .ui-slider-input:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--focus-color);
+}
+
+.tempo-control__speed-slider .ui-slider-input:focus-visible::-moz-range-thumb {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--focus-color);
+}
+
+/* Checkpoints: short ticks every 5 %, taller every 25 % (50, 75 … 150 are the 1st, 6th … 21st marks). */
+.tempo-control__speed-slider .ui-slider-mark {
+  top: calc(50% + var(--_track) / 2 + 3px);
+  width: 1px;
+  height: 3px;
+  margin-left: 0;
+}
+
+.tempo-control__speed-slider .ui-slider-mark:nth-child(5n + 1) {
+  height: 6px;
+}
+
+.tempo-control__speed-slider .ui-slider-mark.is-passed {
+  background: color-mix(in srgb, var(--_speed) 55%, transparent);
+}
+
+/* 100 % (the 11th mark): where normal speed is. */
+.tempo-control__speed-slider .ui-slider-mark:nth-child(11) {
+  width: 2px;
+  height: 7px;
+  margin-left: -1px;
+  background: var(--_speed);
+}
+
+/* Room for "150%" so the track never jumps. */
+.tempo-control__speed-slider .ui-slider-value {
+  min-width: 40px;
+  font-size: var(--fs-xs);
+}
+
+.tempo-control__speed.is-changed .tempo-control__speed-slider .ui-slider-value {
+  color: var(--_speed);
 }

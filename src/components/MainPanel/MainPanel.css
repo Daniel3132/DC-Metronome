@@ -512,6 +512,22 @@
   .main-panel .program-panel__parts-row {
     flex-wrap: wrap;
   }
+
+  /* The header controls (program: count-in, cue, loop, on/off; presets: save buttons) take their own line under the
+     title and wrap there, instead of running past the screen edge. */
+  .main-panel .program-panel .ui-panel-action,
+  .main-panel .quick-presets .ui-panel-action {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: var(--space-1);
+    min-width: 0;
+  }
+
+  /* Buttons keep their labels; the name field beside them is what narrows. */
+  .main-panel .quick-presets .ui-panel-action .ui-button {
+    flex: none;
+  }
 }
 
 /*
