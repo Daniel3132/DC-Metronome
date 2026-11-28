@@ -13,7 +13,7 @@ import type {
 export const MIN_BPM = 60
 export const MAX_BPM = 300
 export const MIN_TEMPO_PERCENT = 50
-export const MAX_TEMPO_PERCENT = 150
+export const MAX_TEMPO_PERCENT = 120
 /** The tempo percentage only takes multiples of this. */
 export const TEMPO_PERCENT_STEP = 5
 export const MAX_BEATS_PER_BAR = 16

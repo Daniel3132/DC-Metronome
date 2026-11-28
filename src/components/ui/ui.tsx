@@ -2,7 +2,8 @@
 //
 //   Panel       card section: title, description?, headerAction? (usually an enable Toggle), children
 //   Toggle      switch (role="switch"): checked, onChange(checked), label, hideLabel?, size?
-//   Slider      range with filled track: value, min, max, step?, onChange, label, format?, orientation?, marks?
+//   Slider      range with filled track: value, min, max, step?, onChange, label, format?, orientation?, marks?,
+//               markLabel?
 //   Stepper     [-] number [+]: press-and-hold repeats, typing commits on Enter/blur, arrow keys step
 //   Segmented   radiogroup of buttons with arrow-key navigation: value, options, onChange, label, wrap?
 //   Select      styled native <select>; options with a `group` become optgroups
@@ -140,6 +141,11 @@ export interface SliderProps {
   orientation?: 'horizontal' | 'vertical'
   /** Values to draw tick marks at (decorative). */
   marks?: number[]
+  /**
+   * Numbers drawn like a ruler at these marks (decorative: clicking one moves the thumb there, as a click on the
+   * track would). Return null to leave a mark unlabelled.
+   */
+  markLabel?: (mark: number) => string | null
   /** Alt+click on the slider puts it back to this value (and says so in its tooltip). */
   defaultValue?: number
   /** Track length of a vertical slider: px number or CSS length (default 180px, or the --slider-length variable). */
@@ -161,6 +167,7 @@ export function Slider({
   disabled = false,
   orientation = 'horizontal',
   marks,
+  markLabel,
   defaultValue,
   length,
   id,
@@ -226,6 +233,23 @@ export function Slider({
               style={{ '--pos': percentOf(m, min, max) / 100 } as CSSProperties}
             />
           ))}
+        </div>
+      )}
+      {markLabel && visibleMarks.length > 0 && (
+        <div className="ui-slider-mark-labels" aria-hidden="true">
+          {visibleMarks.map((m) => {
+            const text = markLabel(m)
+            if (text === null) return null
+            return (
+              <span
+                key={m}
+                className={cx('ui-slider-mark-label', 'tabular', m <= value && 'is-passed', m === value && 'is-current')}
+                style={{ '--pos': percentOf(m, min, max) / 100 } as CSSProperties}
+              >
+                {text}
+              </span>
+            )
+          })}
         </div>
       )}
     </div>

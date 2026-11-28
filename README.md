@@ -6,7 +6,7 @@ A practice metronome for the browser. Its clicks are scheduled on the Web Audio 
 
 - **Tempo** from 60 to 300 BPM: type it, drag the slider, use the ±1 and ±5 buttons (they repeat while held), or use the arrow keys. The Italian tempo marking (Adagio, Allegro …) is shown above the number.
 - **Tap tempo**: the Tap button or the `T` key. A long pause starts a new measurement.
-- **Tempo percentage** (25–200 %): practise at a fraction of the set tempo without losing it. It does not apply to the speed trainer, which always plays its own tempos.
+- **Speed percentage** (50–120 %): practise at a fraction of the set tempo without losing it. It does not apply to the speed trainer, which always plays its own tempos.
 - **Time signatures**: 1–16 beats over 2, 4, 8 or 16, with grouping chips for odd meters (2+2+3 …). The tempo always counts quarter notes, so 3/8 plays twice as fast as 3/4 at the same BPM (and 2/2 half as fast as 2/4).
 - **Subdivisions**: eighths, triplets, sixteenths, quintuplets, sextuplets, swing, gallop, reverse gallop and dotted.
 - **Accents and silent beats**: one-tap accent patterns (Plain = accent on 1 only, or groupings like 3+3, 2+2+3), and a beat pad click cycles it through accent, sub-accent, normal and mute. The sub-accent (beat 4 of 6/8 as 3+3) has its own sound and mixer fader.
@@ -33,6 +33,22 @@ A practice metronome for the browser. Its clicks are scheduled on the Web Audio 
 - **Presets**: save, rename, overwrite, delete, and import or export them as JSON. A preset keeps everything, the program included. There are also 10 factory presets (waltz, 6/8, 7/8, song form …).
 - **Clear stored data**: the button at the bottom of the Presets tab erases settings, presets, templates and uploaded sounds from this browser and restarts with factory defaults.
 - **Visual feedback**: the playing beat lights up on the beat grid, the status bar shows bar, beat, time, section and trainers, and you can turn on a screen flash on every beat.
+- **Shared rooms**: create an invite link or join by room code to share tempo, meter, subdivision, accents and start/stop with other listeners. Each listener keeps local sounds and mixer settings; programs and trainers pause until they leave. Invite-link guests can enable audio from the Room menu. Rooms are temporary and close when everyone leaves.
+
+### Configure shared rooms
+
+Room sync uses Supabase Realtime public broadcast channels. Create a Supabase project, then add these environment variables to the Vercel project and redeploy:
+
+```text
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your-project-key
+```
+
+For local development, copy `.env.example` to `.env.local` and fill in the same values.
+
+Rooms use public channels, so in the Supabase dashboard keep **Realtime → Settings → Allow public access** enabled. Without it every join fails with an "Unauthorized" error. Anyone who has a room's 16-character code can join that room; there is no list of rooms.
+
+The browser uses the public publishable key; never set a secret or legacy service-role key here. For compatibility, `VITE_SUPABASE_ANON_KEY` is also accepted as a fallback. No database tables or additional Vercel functions are needed. The [free Supabase Realtime plan](https://supabase.com/docs/guides/realtime/limits) currently allows 200 concurrent connections and 2 million messages per month; [free projects may pause after a week of inactivity](https://supabase.com/pricing).
 
 ## Keyboard shortcuts
 
@@ -40,9 +56,10 @@ A practice metronome for the browser. Its clicks are scheduled on the Web Audio 
 | --- | --- |
 | `Space` | Start / stop |
 | `T` | Tap tempo |
-| `↑` / `↓` | Tempo ±1 BPM |
-| `Shift` + `↑` / `↓` | Tempo ±10 BPM |
-| `+` / `−` | Tempo % ±5 |
+| `←` / `→` | Tempo ±1 BPM |
+| `Ctrl` + `←` / `→` | Tempo ±5 BPM |
+| `Shift` + `←` / `→` | Tempo ±10 BPM |
+| `+` / `−` | Speed percentage ±5 % |
 | `M` | Mute / unmute |
 | `S` | Rest bar (gap trainer) on / off |
 | `V` | Voice counting on / off |
@@ -53,7 +70,7 @@ A practice metronome for the browser. Its clicks are scheduled on the Web Audio 
 | `1` – `5` | Open a settings tab (`1` = Quick) |
 | `Esc` | Back to the Quick tab |
 
-Shortcuts are ignored while you type in a text field or a select, and while Ctrl, Alt or Meta is held. Sliders, radio groups and tabs keep their own arrow keys. The **Shortcuts** button in the header lists them all.
+Shortcuts are ignored while you type in a text field or a select, and while Alt or Meta is held (Ctrl only works with the tempo arrows). Sliders, radio groups and tabs keep their own arrow keys. The **Shortcuts** button in the header lists them all.
 
 ## Running it
 
@@ -101,6 +118,7 @@ src/
   state/       React glue
     useSettings.ts           Settings state, always sanitized, debounced save to localStorage
     useMetronome.ts          Pushes settings to the engine, subscribes to its snapshot
+    room.ts                  Temporary Supabase Realtime rooms, invite links and shared playback state
     useCustomSounds.ts       Uploaded-sound list and its actions
     useKeyboardShortcuts.ts  Global shortcuts
     storage.ts, factoryPresets.ts

@@ -117,6 +117,11 @@ export const presetActions = {
     update({ presets: current().presets.map((p) => (p.id === id ? { ...p, ...patch } : p)) })
   },
 
+  /** Overwrites a preset with these settings and stamps it as new. */
+  overwrite(id: string, settings: Settings) {
+    presetActions.replace(id, { settings, createdAt: Date.now() })
+  },
+
   /** Overwrites the active preset with these settings; false when no preset is active. */
   saveActive(settings: Settings): boolean {
     const { active } = current()

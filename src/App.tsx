@@ -12,6 +12,7 @@ import { TapTempoButton, type TapTempoHandle } from './components/TapTempoButton
 import { TempoControl } from './components/TempoControl/TempoControl'
 import { Transport } from './components/Transport/Transport'
 import { VoicePanel } from './components/VoicePanel/VoicePanel'
+import { RoomMenu } from './components/RoomMenu/RoomMenu'
 import { CheckIcon, FlashIcon, MetronomeIcon, SaveIcon, XIcon } from './components/icons/icons'
 import { Button, IconButton, Toggle } from './components/ui/ui'
 import type { PanelProps } from './components/panelTypes'
@@ -19,6 +20,7 @@ import { clampTempoPercent, findPart, practiceAt, selectPart, selectSection, wit
 import type { PartRef, Rhythm, Settings } from './core/types'
 import { useKeyboardShortcuts } from './state/useKeyboardShortcuts'
 import { useMetronome } from './state/useMetronome'
+import { useRoom } from './state/room'
 import { presetActions, UNDO_MS, usePresets } from './state/usePresets'
 import { useSettings } from './state/useSettings'
 import './App.css'
@@ -106,7 +108,8 @@ function finishedMessage(settings: Settings): string {
  */
 export default function App() {
   const [settings, update] = useSettings()
-  const metronome = useMetronome(settings)
+  const roomSession = useRoom(settings, update)
+  const metronome = useMetronome(settings, roomSession.playback)
   const { playback } = metronome
   const [tab, setTab] = useState<TabId>(MAIN_TAB)
   const { activeName, deleted } = usePresets()
@@ -115,6 +118,51 @@ export default function App() {
   const tapTempo = useRef<TapTempoHandle>(null)
   const tabList = useRef<HTMLDivElement>(null)
   const idBase = useId()
+
+  const togglePlayback = () => {
+    // The room is playing but this device is silent (audio blocked, or it failed to start): join in instead of
+    // stopping everyone, since the button here shows "stopped".
+    if (roomSession.room?.status === 'connected' && roomSession.playback?.playing && playback.status === 'stopped') {
+      enableRoomAudio()
+      return Promise.resolve()
+    }
+    if (roomSession.toggleTransport()) return Promise.resolve()
+    return metronome.toggle()
+  }
+
+  const { start: startMetronome, stop: stopMetronome, keepAwake } = metronome
+  useEffect(() => {
+    const command = roomSession.transport
+    if (!command) return
+    stopMetronome()
+    if (command.playing) void startMetronome(command.startsAt ?? undefined, command.barSeconds)
+  }, [startMetronome, stopMetronome, roomSession.transport])
+
+  const inRoom = !!roomSession.room && !roomSession.room.error
+  useEffect(() => {
+    keepAwake(inRoom)
+  }, [keepAwake, inRoom])
+
+  function createRoom() {
+    void metronome.prepareAudio()
+    void roomSession.create()
+  }
+
+  function joinRoom(code: string) {
+    void metronome.prepareAudio()
+    void roomSession.join(code)
+  }
+
+  function leaveRoom() {
+    roomSession.leave()
+    metronome.stop()
+  }
+
+  function enableRoomAudio() {
+    void metronome.prepareAudio().then((ready) => {
+      if (ready) roomSession.resync()
+    })
+  }
 
   const pulse = playback.status === 'playing' ? playback.pulse : null
   const { sections } = settings
@@ -154,7 +202,7 @@ export default function App() {
   }, [presetSaved])
 
   useKeyboardShortcuts({
-    togglePlay: () => void metronome.toggle(),
+    togglePlay: () => void togglePlayback(),
     tap: () => tapTempo.current?.tap(),
     nudgeBpm: (delta) => update((prev) => withBpm(prev, prev.bpm + delta)),
     nudgeTempoPercent: (delta) =>
@@ -258,6 +306,7 @@ export default function App() {
             />
           </span>
           <ThemePicker />
+          <RoomMenu room={roomSession.room} onCreate={createRoom} onJoin={joinRoom} onLeave={leaveRoom} onEnableAudio={enableRoomAudio} />
           <ShortcutsHelp />
         </div>
       </header>
@@ -274,7 +323,7 @@ export default function App() {
             status={playback.status}
             error={playback.error}
             finished={playback.ended ? finishedMessage(settings) : null}
-            onToggle={metronome.toggle}
+            onToggle={togglePlayback}
             aside={<TapTempoButton ref={tapTempo} onTempo={setBpm} />}
           />
           <BeatGrid rhythm={shownRhythm} target={shownTarget} name={shownName} onChange={update} pulse={pulse} />

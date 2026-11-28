@@ -36,8 +36,10 @@ export const SHORTCUTS: readonly ShortcutInfo[] = [
   { keys: ['←'], description: 'Tempo −1 BPM' },
   { keys: ['Shift', '→'], description: 'Tempo +10 BPM' },
   { keys: ['Shift', '←'], description: 'Tempo −10 BPM' },
-  { keys: ['+'], description: 'Tempo % +5' },
-  { keys: ['−'], description: 'Tempo % −5' },
+  { keys: ['Ctrl', '→'], description: 'Tempo +5 BPM' },
+  { keys: ['Ctrl', '←'], description: 'Tempo −5 BPM' },
+  { keys: ['+'], description: 'Speed percentage +5 %' },
+  { keys: ['−'], description: 'Speed percentage −5 %' },
   { keys: ['M'], description: 'Mute / unmute' },
   { keys: ['S'], description: 'Rest bar (gap trainer) on / off' },
   { keys: ['V'], description: 'Voice counting on / off' },
@@ -51,6 +53,7 @@ export const SHORTCUTS: readonly ShortcutInfo[] = [
 ]
 
 const BPM_STEP = 1
+const BPM_MID_STEP = 5
 const BPM_BIG_STEP = 10
 const PERCENT_STEP = 5
 
@@ -75,8 +78,14 @@ function modalOpen(): boolean {
   return document.querySelector('dialog[open]') !== null
 }
 
+function isTempoArrow(e: KeyboardEvent): boolean {
+  return e.key === 'ArrowRight' || e.key === 'ArrowLeft'
+}
+
+/** Ctrl is allowed only on the tempo arrows (Ctrl+←/→ = ±5 BPM); every other shortcut ignores modified keys. */
 function ignored(e: KeyboardEvent): boolean {
-  return e.ctrlKey || e.metaKey || e.altKey || e.isComposing || isTextEntry(e.target) || modalOpen()
+  const modified = e.metaKey || e.altKey || (e.ctrlKey && !(isTempoArrow(e) && !e.shiftKey))
+  return modified || e.isComposing || isTextEntry(e.target) || modalOpen()
 }
 
 /** An open popover (the shortcuts help) owns Escape: it closes itself first. */
@@ -107,7 +116,8 @@ function isSpace(e: KeyboardEvent): boolean {
 }
 
 /**
- * Global keyboard shortcuts (see SHORTCUTS). Ignored while typing in a form field, with Ctrl/Meta/Alt, or while a
+ * Global keyboard shortcuts (see SHORTCUTS). Ignored while typing in a form field, with Meta/Alt (Ctrl only on the
+ * tempo arrows), or while a
  * modal dialog is open.
  * Space always means start/stop, so it never also activates the focused button.
  */
@@ -123,11 +133,11 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers): void {
     }
 
     // Left / right, the same way the tempo slider moves.
-    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+    if (isTempoArrow(e)) {
       if (e.defaultPrevented) return
       if (e.target instanceof Element && e.target.closest(ARROW_OWNERS)) return
       e.preventDefault()
-      const step = e.shiftKey ? BPM_BIG_STEP : BPM_STEP
+      const step = e.ctrlKey ? BPM_MID_STEP : e.shiftKey ? BPM_BIG_STEP : BPM_STEP
       handlers.nudgeBpm(e.key === 'ArrowRight' ? step : -step)
       return
     }
