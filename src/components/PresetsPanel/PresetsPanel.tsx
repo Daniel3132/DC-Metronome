@@ -156,7 +156,7 @@ export function PresetsPanel({ settings, onChange }: PanelProps) {
       focusRequest.current = neighbour ? elId(neighbour.id, 'load') : saveInputId
       report('list', `Deleted "${preset.name}".`)
     } else {
-      presetActions.replace(preset.id, { settings, createdAt: Date.now() })
+      presetActions.overwrite(preset.id, settings)
       focusRequest.current = elId(preset.id, 'load')
       report('list', `Updated "${preset.name}" with the current settings.`)
     }

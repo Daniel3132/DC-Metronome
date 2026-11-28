@@ -17,7 +17,10 @@ interface TempoControlProps {
   playingBaseBpm: number | null
 }
 
-/** A checkpoint at every step of the speed bar (50, 55 … 150). The CSS emphasizes every 25 % and 100 %. */
+/** Ruler numbers every 10 % (50, 60 … 120), so a value like 70 can be found at a glance. */
+const percentMarkLabel = (mark: number): string | null => (mark % 10 === 0 ? String(mark) : null)
+
+/** A checkpoint at every step of the speed bar (50, 55 … 120). The CSS emphasizes every 25 % and 100 %. */
 const PERCENT_MARKS = Array.from(
   { length: (MAX_TEMPO_PERCENT - MIN_TEMPO_PERCENT) / TEMPO_PERCENT_STEP + 1 },
   (_, i) => MIN_TEMPO_PERCENT + i * TEMPO_PERCENT_STEP,
@@ -292,29 +295,30 @@ export function TempoControl({ settings, onChange, playingBpm, playingBaseBpm }:
           </HoldButton>
         </div>
 
-        {/* Speed: scales the tempo played, in steps of 5 % (resets to 100 % from its label). */}
+        {/* Speed percentage: scales the tempo played, in steps of 5 % (resets to 100 % from its label). */}
         <div className={`tempo-control__speed${tempoPercent !== 100 ? ' is-changed' : ''}`}>
           <Button
             variant="ghost"
             size="sm"
             className="tempo-control__speed-reset"
-            title={tempoPercent !== 100 ? 'Reset speed to 100 %' : 'Speed: scales the tempo played'}
-            aria-label="Reset speed to 100 %"
+            title={tempoPercent !== 100 ? 'Reset speed percentage to 100 %' : 'Speed percentage: scales the tempo played'}
+            aria-label="Reset speed percentage to 100 %"
             disabled={tempoPercent === 100}
             onClick={() => setPercent(100)}
           >
-            Speed
+            Speed %
           </Button>
           <div className="tempo-control__speed-control" title="Plays the tempo at this percentage (steps of 5 %)">
             <Slider
               className="tempo-control__speed-slider"
-              label="Tempo percentage"
+              label="Speed %"
               hideLabel
               value={tempoPercent}
               min={MIN_TEMPO_PERCENT}
               max={MAX_TEMPO_PERCENT}
               step={TEMPO_PERCENT_STEP}
               marks={PERCENT_MARKS}
+              markLabel={percentMarkLabel}
               defaultValue={DEFAULT_TEMPO_PERCENT}
               format={(v) => `${v}%`}
               onChange={setPercent}

@@ -79,7 +79,7 @@ function readTrack(reader: Reader, end: number, orderStart: number): { events: M
   let status = 0
   while (reader.pos < end) {
     tick += reader.varLen()
-    let first = reader.byte()
+    const first = reader.byte()
     if (first === 0xff) {
       const type = reader.byte()
       const data = reader.take(reader.varLen())
@@ -93,11 +93,11 @@ function readTrack(reader: Reader, end: number, orderStart: number): { events: M
     }
     if (first & 0x80) {
       status = first
-      first = reader.byte()
+      reader.byte() // the running-status byte was the status; this is the first data byte
     } else if (status === 0) {
       throw new MidiError('The MIDI file has a data byte without a status.')
     }
-    // `first` is the first data byte; program change and channel pressure have one, the rest two.
+    // The first data byte has been read; program change and channel pressure have one, the rest two.
     const kind = status & 0xf0
     if (kind !== 0xc0 && kind !== 0xd0) reader.byte()
   }

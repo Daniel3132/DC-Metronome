@@ -229,7 +229,7 @@
     0 0 0 4px var(--focus-color);
 }
 
-/* Checkpoints: short ticks every 5 %, taller every 25 % (50, 75 … 150 are the 1st, 6th … 21st marks). */
+/* Checkpoints: short ticks every 5 %, taller every 25 % (50, 75, 100 are the 1st, 6th, 11th marks). */
 .tempo-control__speed-slider .ui-slider-mark {
   top: calc(50% + var(--_track) / 2 + 3px);
   width: 1px;
@@ -253,7 +253,18 @@
   background: var(--_speed);
 }
 
-/* Room for "150%" so the track never jumps. */
+/* Ruler numbers: muted, the passed ones tinted, 100 % (6th number) and the one under the thumb strongest. */
+.tempo-control__speed-slider .ui-slider-mark-label.is-passed {
+  color: color-mix(in srgb, var(--_speed) 70%, var(--text-muted));
+}
+
+.tempo-control__speed-slider .ui-slider-mark-label:nth-child(6),
+.tempo-control__speed-slider .ui-slider-mark-label.is-current {
+  color: var(--_speed);
+  font-weight: var(--fw-bold);
+}
+
+/* Room for "120%" so the track never jumps. */
 .tempo-control__speed-slider .ui-slider-value {
   min-width: 40px;
   font-size: var(--fs-xs);

@@ -529,6 +529,25 @@
   background: var(--accent-border);
 }
 
+/* Ruler numbers in the free strip above the track, centred on their marks (same position formula). */
+.ui-slider-mark-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ui-slider-mark-label {
+  position: absolute;
+  bottom: calc(50% + var(--_thumb) / 2 + 1px);
+  left: calc(var(--_thumb) / 2 + (100% - var(--_thumb)) * var(--pos));
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: var(--fw-medium);
+  line-height: 1;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
 /*
  * Vertical (mixer fader): the range input is rotated -90deg inside a fixed-size box. Unlike writing-mode,
  * a rotated input styles identically in Chromium, Firefox and Safari; ArrowUp still increases the value.

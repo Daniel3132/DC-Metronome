@@ -1,11 +1,16 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react'
 import { getEngine } from '../audio/engine'
 import { playbackSettings } from '../core/settings'
 import type { PlaybackSnapshot, PulseEvent, Settings, SoundId, SoundRole, VoiceWord } from '../core/types'
+import { settingsForRoom, type RoomPlayback } from './room'
 
 export interface MetronomeControls {
   playback: PlaybackSnapshot
-  start: () => Promise<void>
+  /** sharedStartAt: room start (Date.now() ms); barSeconds lets a late start snap to the room's next bar. */
+  start: (sharedStartAt?: number, barSeconds?: number) => Promise<void>
+  prepareAudio: () => Promise<boolean>
+  /** Keep the audio context running while idle (in a room, starts arrive outside user gestures). */
+  keepAwake: (awake: boolean) => void
   stop: () => void
   toggle: () => Promise<void>
   previewSound: (id: SoundId, role: SoundRole) => Promise<void>
@@ -20,31 +25,35 @@ export interface MetronomeControls {
  * the working rhythm) to engine.setSettings whenever they change
  * and exposes the playback snapshot through useSyncExternalStore.
  */
-export function useMetronome(settings: Settings): MetronomeControls {
+export function useMetronome(settings: Settings, roomPlayback: RoomPlayback | null = null): MetronomeControls {
   const engine = getEngine()
-  const latest = useRef(settings)
+  const latest = useRef(settingsForRoom(settings, roomPlayback))
 
   useEffect(() => {
-    latest.current = settings
-    engine.setSettings(playbackSettings(settings))
-  }, [engine, settings])
+    const current = settingsForRoom(settings, roomPlayback)
+    latest.current = current
+    engine.setSettings(playbackSettings(current))
+  }, [engine, roomPlayback, settings])
 
   const playback = useSyncExternalStore(engine.subscribe, engine.getSnapshot, engine.getSnapshot)
 
   // Re-push right before starting so a start in the same tick as a settings change never plays stale settings.
-  const start = () => {
+  // useCallback here is a contract, not a perf memo: App's room-transport effect depends on a stable start.
+  const start = useCallback((sharedStartAt?: number, barSeconds?: number) => {
     engine.setSettings(playbackSettings(latest.current))
-    return engine.start()
-  }
+    return engine.start(sharedStartAt, barSeconds)
+  }, [engine])
 
-  const toggle = () => {
+  const toggle = useCallback(() => {
     if (engine.getSnapshot().status === 'stopped') engine.setSettings(playbackSettings(latest.current))
     return engine.toggle()
-  }
+  }, [engine])
 
   return {
     playback,
     start,
+    prepareAudio: engine.prepareAudio,
+    keepAwake: engine.keepAwake,
     stop: engine.stop,
     toggle,
     previewSound: engine.previewSound,

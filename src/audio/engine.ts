@@ -111,6 +111,20 @@ function outputLatency(ctx: AudioContext): number {
   return ctx.outputLatency || ctx.baseLatency || 0
 }
 
+/**
+ * Map a shared wall-clock start (ms, Date.now() scale) onto this context's clock. Output latency is subtracted so
+ * the first click is *heard* at that instant, also through slow outputs such as Bluetooth. A start that is already
+ * too close (slow asset loading) moves forward by whole bars so it stays on the room's bar grid.
+ */
+function sharedStartTime(ctx: AudioContext, sharedStartAt: number, barSeconds?: number): number {
+  const earliest = ctx.currentTime + START_DELAY
+  let startTime = ctx.currentTime + (sharedStartAt - Date.now()) / 1000 - outputLatency(ctx)
+  if (startTime >= earliest) return startTime
+  if (!barSeconds || !(barSeconds > 0)) return earliest
+  startTime += Math.ceil((earliest - startTime) / barSeconds) * barSeconds
+  return startTime
+}
+
 function sameMixer(a: MixerSettings, b: MixerSettings): boolean {
   return (
     a === b ||
@@ -235,6 +249,8 @@ export class MetronomeEngine {
   private interval: ReturnType<typeof setInterval> | null = null
   private frameId: number | null = null
   private idleTimer: ReturnType<typeof setTimeout> | null = null
+  /** Set by keepAwake(): never suspend the context when idle. */
+  private awake = false
 
   private readonly sounding = new Set<Sounding>()
   /** Section announcements waiting for their pulse to be heard (speech synthesis cannot be scheduled ahead). */
@@ -280,7 +296,7 @@ export class MetronomeEngine {
    * resumes the AudioContext, waits (max ~1.5 s) for the needed buffers, then schedules the first pulse a few
    * tens of milliseconds ahead. Errors are reported through the snapshot's `error`, not thrown.
    */
-  start = async (): Promise<void> => {
+  start = async (sharedStartAt?: number, barSeconds?: number): Promise<void> => {
     if (this.snapshot.status !== 'stopped') return
     const token = ++this.startToken
     this.publish({ status: 'starting', pulse: null, startTime: null, ended: false, error: null })
@@ -296,7 +312,9 @@ export class MetronomeEngine {
       await Promise.race([loaded, delay(LOAD_TIMEOUT_MS)])
       if (token !== this.startToken) return
 
-      const startTime = ctx.currentTime + START_DELAY
+      const startTime = sharedStartAt === undefined
+        ? ctx.currentTime + START_DELAY
+        : sharedStartTime(ctx, sharedStartAt, barSeconds)
       this.sequencer = createSequencer(this.currentSettings(), startTime)
       this.sequenceEnded = false
       this.lastPulse = null
@@ -310,6 +328,30 @@ export class MetronomeEngine {
       if (token !== this.startToken) return
       this.halt(true)
       this.publish({ status: 'stopped', pulse: null, startTime: null, error: this.messageFor(error) })
+    }
+  }
+
+  /** Resume the silent audio graph from a user gesture so a later room start can be scheduled safely. */
+  prepareAudio = async (): Promise<boolean> => {
+    try {
+      return await this.resume(this.ensureContext())
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * While true, the context is never suspended when idle: a room start arrives over the network, outside any
+   * user gesture, and some browsers (iOS Safari) refuse to resume a suspended context then. Bound.
+   */
+  keepAwake = (awake: boolean): void => {
+    if (this.awake === awake) return
+    this.awake = awake
+    if (awake) {
+      if (this.idleTimer !== null) clearTimeout(this.idleTimer)
+      this.idleTimer = null
+    } else {
+      this.suspendWhenIdle()
     }
   }
 
@@ -542,6 +584,8 @@ export class MetronomeEngine {
   /** (Re)arm the idle timer; start() and the previews resume the context inside their user gesture. */
   private suspendWhenIdle(): void {
     if (this.idleTimer !== null) clearTimeout(this.idleTimer)
+    this.idleTimer = null
+    if (this.awake) return
     this.idleTimer = setTimeout(() => {
       this.idleTimer = null
       const ctx = this.ctx
